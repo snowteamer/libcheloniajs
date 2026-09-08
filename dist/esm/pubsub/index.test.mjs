@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createClient } from './index.mjs';
-const client = createClient('ws://localhost:8080', {
+import PubsubClient from './index.mjs';
+const client = new PubsubClient('ws://localhost:8080', {
     manual: true,
     reconnectOnDisconnection: false,
     reconnectOnOnline: false,

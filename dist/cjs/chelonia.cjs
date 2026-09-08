@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -10,7 +43,7 @@ const sbp_1 = __importDefault(require("@sbp/sbp"));
 const turtledash_1 = require("turtledash");
 const functions_js_1 = require("./functions.cjs");
 const buffer_1 = require("buffer");
-const index_js_1 = require("./pubsub/index.cjs");
+const index_js_1 = __importStar(require("./pubsub/index.cjs"));
 const reingestTracker_js_1 = require("./reingestTracker.cjs");
 const crypto_1 = require("@chelonia/crypto");
 const errors_js_1 = require("./errors.cjs");
@@ -769,7 +802,7 @@ exports.default = (0, sbp_1.default)('sbp/selectors/register', {
         }
         (0, sbp_1.default)('chelonia/private/startClockSync');
         const rawKvHandler = options.messageHandlers?.[index_js_1.NOTIFICATION_TYPE.KV];
-        this.pubsub = (0, index_js_1.createClient)(pubsubURL, {
+        this.pubsub = new index_js_1.default(pubsubURL, {
             ...this.config.connectionOptions,
             handlers: {
                 ...options.handlers,
@@ -1717,7 +1750,7 @@ exports.default = (0, sbp_1.default)('sbp/selectors/register', {
         });
         if (!response.ok) {
             console.error('Unable to fetch own resources', contractID, response.status);
-            throw new Error(`Unable to fetch own resources for ${contractID}: ${response.status}`);
+            throw new errors_js_1.ChelErrorUnexpectedHttpResponseCode(`Unable to fetch own resources for ${contractID}: ${(0, utils_js_1.httpErrorMessage)(response)}`, { cause: response.status });
         }
         return response.json();
     },
@@ -2176,7 +2209,7 @@ exports.default = (0, sbp_1.default)('sbp/selectors/register', {
                 // These are not treated as errors since we could still set the value.
             }
             else if (response.status !== 404 && response.status !== 410) {
-                throw new errors_js_1.ChelErrorUnexpectedHttpResponseCode('[kv/set] Invalid response code: ' + response.status);
+                throw new errors_js_1.ChelErrorUnexpectedHttpResponseCode(`[kv/set] ${(0, utils_js_1.httpErrorMessage)(response)}`, { cause: response.status });
             }
             // When a 409/412 response provides neither an etag header nor a
             // body, the retry loop cannot recover — it would re-send
@@ -2322,7 +2355,7 @@ exports.default = (0, sbp_1.default)('sbp/selectors/register', {
                             break;
                         }
                     }
-                    throw new errors_js_1.ChelErrorUnexpectedHttpResponseCode('kv/set invalid response status: ' + response.status);
+                    throw new errors_js_1.ChelErrorUnexpectedHttpResponseCode(`[kv/set] ${(0, utils_js_1.httpErrorMessage)(response)}`, { cause: response.status });
                 }
                 // Successful write: capture the server-issued etag (x-cid /
                 // etag header) so the resolved value reflects the freshest
@@ -2347,7 +2380,7 @@ exports.default = (0, sbp_1.default)('sbp/selectors/register', {
             return null;
         }
         if (!response.ok) {
-            throw new Error('Invalid response status: ' + response.status);
+            throw new errors_js_1.ChelErrorUnexpectedHttpResponseCode(`[kv/get] ${(0, utils_js_1.httpErrorMessage)(response)}`, { cause: response.status });
         }
         const etag = response.headers.get('x-cid') || response.headers.get('etag');
         const data = await response.json();

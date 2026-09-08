@@ -2,7 +2,7 @@ import type { Key } from '@chelonia/crypto';
 import type sbp from '@sbp/sbp';
 import type { SPMessage, SPMsgDirection, SPOpType } from './SPMessage.mjs';
 import type { EncryptedData } from './encryptedData.mjs';
-import type { PubSubClient } from './pubsub/index.mjs';
+import type PubsubClient from './pubsub/index.mjs';
 import type { SignedDataContext } from './signedData.mjs';
 import type { KV_AUTO_LOAD, KV_LOAD_STATUS, KV_UPDATE_REASON, KvNoop } from './kv-constants.mjs';
 export type JSONType = null | string | number | boolean | JSONObject | JSONArray;
@@ -72,7 +72,7 @@ export type CheloniaConfig = {
             (e: unknown, contractID: string): void;
         } | null;
         pubsubError: {
-            (e: unknown, socket: PubSubClient): void;
+            (e: unknown, socket: PubsubClient): void;
         } | null;
     }>;
     skipDecryptionAttempts: boolean;
@@ -295,12 +295,12 @@ export type CheloniaContext = {
     pending: {
         contractID: string;
     }[];
-    pubsub: import('./pubsub/index.mjs').PubSubClient;
+    pubsub: PubsubClient;
     contractsModifiedListener: (contracts: string[], { added, removed }: {
         added: string[];
         removed: string[];
     }) => void;
-    kvReconnectListener?: (client: import('./pubsub/index.mjs').PubSubClient) => void;
+    kvReconnectListener?: (client: PubsubClient) => void;
     kvContractsModifiedListener?: (contracts: string[], { added, removed }: {
         added: string[];
         removed: string[];

@@ -48,6 +48,7 @@ export type ResponseTypeEnum = (typeof RESPONSE_TYPE)[keyof typeof RESPONSE_TYPE
 type TimeoutID = ReturnType<typeof setTimeout>;
 
 export type Options = {
+  // Whether to log received pings.
   logPingMessages: boolean;
   pingTimeout: number;
   maxReconnectionDelay: number;
@@ -62,9 +63,13 @@ export type Options = {
   maxOpRetries: number;
   // Base interval between retries (linear backoff)
   opRetryInterval: number;
+  // Whether the factory should call 'connect()' automatically.
+  // Also named 'autoConnect' or 'startClosed' in other libraries.
   manual?: boolean;
+  // Custom handlers for WebSocket events.
   // eslint-disable-next-line no-use-before-define
   handlers?: Partial<ClientEventHandlers>;
+  // Custom handlers for different message types.
   // eslint-disable-next-line no-use-before-define
   messageHandlers?: Partial<MessageHandlers>;
 };
@@ -74,75 +79,42 @@ export type Message = {
   type: string;
 };
 
-export type PubSubClient = {
-  connectionTimeoutID: TimeoutID | undefined;
-  connectionTimeUsed?: number;
-  // eslint-disable-next-line no-use-before-define
-  customEventHandlers: Partial<ClientEventHandlers>;
-  failedConnectionAttempts: number;
-  isLocal: boolean;
-  isNew: boolean;
-  // eslint-disable-next-line no-use-before-define
-  listeners: ClientEventHandlers;
-  // eslint-disable-next-line no-use-before-define
-  messageHandlers: MessageHandlers;
-  nextConnectionAttemptDelayID: TimeoutID | undefined;
-  options: Options;
-  // eslint-disable-next-line no-use-before-define
-  pendingOperations: TieredMap<RequestTypeEnum, string, object>;
-  pingTimeoutID: TimeoutID | undefined;
-  shouldReconnect: boolean;
-  socket: WebSocket | null;
-  subscriptionSet: Set<string>;
-  kvFilter: Map<string, string[]>;
-  url: string;
-  // Methods
-  clearAllTimers(this: PubSubClient): void;
-  connect(this: PubSubClient): void;
-  destroy(this: PubSubClient): void;
-  pub(this: PubSubClient, channelID: string, data: JSONType): void;
-  scheduleConnectionAttempt(this: PubSubClient): void;
-  sub(this: PubSubClient, channelID: string): void;
-  unsub(this: PubSubClient, channelID: string): void;
-  getNextRandomDelay(this: PubSubClient): number;
-  setKvFilter(this: PubSubClient, channelID: string, kvFilter?: string[]): void;
-};
 
 type ClientEventHandlers = {
-  close(this: PubSubClient, event: CloseEvent): void;
-  error(this: PubSubClient, event: Event): void;
-  message(this: PubSubClient, event: MessageEvent): void;
-  offline(this: PubSubClient, event: Event): void;
-  online(this: PubSubClient, event: Event): void;
-  open(this: PubSubClient, event: Event): void;
-  'reconnection-attempt'(this: PubSubClient, event: CustomEvent): void;
-  'reconnection-succeeded'(this: PubSubClient, event: CustomEvent): void;
-  'reconnection-failed'(this: PubSubClient, event: CustomEvent): void;
-  'reconnection-scheduled'(this: PubSubClient, event: CustomEvent): void;
-  'subscription-succeeded'(this: PubSubClient, event: CustomEvent): void;
+  close(this: PubsubClient, event: CloseEvent): void;
+  error(this: PubsubClient, event: Event): void;
+  message(this: PubsubClient, event: MessageEvent): void;
+  offline(this: PubsubClient, event: Event): void;
+  online(this: PubsubClient, event: Event): void;
+  open(this: PubsubClient, event: Event): void;
+  'reconnection-attempt'(this: PubsubClient, event: CustomEvent): void;
+  'reconnection-succeeded'(this: PubsubClient, event: CustomEvent): void;
+  'reconnection-failed'(this: PubsubClient, event: CustomEvent): void;
+  'reconnection-scheduled'(this: PubsubClient, event: CustomEvent): void;
+  'subscription-succeeded'(this: PubsubClient, event: CustomEvent): void;
 };
 
 type MessageHandlers = {
   [NOTIFICATION_TYPE.ENTRY](
-    this: PubSubClient,
+    this: PubsubClient,
     msg: { data: JSONType; type: string; [x: string]: unknown },
   ): void;
-  [NOTIFICATION_TYPE.PING](this: PubSubClient, msg: { data: JSONType }): void;
-  [NOTIFICATION_TYPE.PUB](this: PubSubClient, msg: { channelID: string; data: JSONType }): void;
+  [NOTIFICATION_TYPE.PING](this: PubsubClient, msg: { data: JSONType }): void;
+  [NOTIFICATION_TYPE.PUB](this: PubsubClient, msg: { channelID: string; data: JSONType }): void;
   [NOTIFICATION_TYPE.KV](
-    this: PubSubClient,
+    this: PubsubClient,
     msg: { channelID: string; key: string; data: JSONType; cid?: string },
   ): void;
   [NOTIFICATION_TYPE.SUB](
-    this: PubSubClient,
+    this: PubsubClient,
     msg: { channelID: string; type: string; data: JSONType },
   ): void;
   [NOTIFICATION_TYPE.UNSUB](
-    this: PubSubClient,
+    this: PubsubClient,
     msg: { channelID: string; type: string; data: JSONType },
   ): void;
   [RESPONSE_TYPE.ERROR](
-    this: PubSubClient,
+    this: PubsubClient,
     msg: {
       data: {
         type: string;
@@ -154,7 +126,7 @@ type MessageHandlers = {
       };
     },
   ): void;
-  [RESPONSE_TYPE.OK](this: PubSubClient, msg: { data:
+  [RESPONSE_TYPE.OK](this: PubsubClient, msg: { data:
     { type: string; channelID: string; kvFilter?: string[] }
   }): void;
 };
@@ -177,20 +149,28 @@ export type UnsubMessage = {
   channelID: string;
 };
 
-// TODO: verify these are good defaults
 const defaultOptions: Options = {
+  // Whether to log received pings.
   logPingMessages: process.env.NODE_ENV === 'development' && !process.env.CI,
+  // How long to wait for the server to send a ping, in milliseconds.
   pingTimeout: 45000,
   maxReconnectionDelay: 60000,
   maxRetries: 10,
   minReconnectionDelay: 500,
+  // Whether to reconnect after a server-side disconnection.
   reconnectOnDisconnection: true,
+  // Whether to reconnect after coming back online.
   reconnectOnOnline: true,
+  // Whether to reconnect after a connection timeout.
   // Defaults to false to avoid reconnection attempts in case the server doesn't
   // respond because of a failed authentication.
   reconnectOnTimeout: false,
   reconnectionDelayGrowFactor: 2,
+  // Connection timeout duration in milliseconds.
   timeout: 60000,
+
+  /* Options for runWithRetries(), which uses linear backoff rather than exponential. */
+
   maxOpRetries: 4,
   opRetryInterval: 2000
 }
@@ -269,13 +249,13 @@ const isKvFilterFresh = (
   return true
 }
 
-const pubPayloadFactory = (client: PubSubClient, channelID: string) => () => {
+const pubPayloadFactory = (client: PubsubClient, channelID: string) => () => {
   const kvFilter = client.kvFilter.get(channelID)
   return kvFilter ? { kvFilter, channelID } : { channelID } as JSONObject
 }
 
 function runWithRetry (
-  client: PubSubClient,
+  client: PubsubClient,
   channelID: string,
   type: RequestTypeEnum,
   getPayload: () => JSONObject
@@ -319,88 +299,311 @@ function runWithRetry (
   send()
 }
 
-// ====== API ====== //
+export default class PubsubClient {
+  connectionTimeoutID?: TimeoutID
+  connectionTimeUsed = 0
+  customEventHandlers: Partial<ClientEventHandlers> = {}
+  failedConnectionAttempts = 0
+  // The current number of connection attempts that failed.
+  // Reset to 0 upon successful connection.
+  // Used to compute how long to wait before the next reconnection attempt.
+  get isLocal () { return /\/\/(localhost|127\.0\.0\.1)([:?/]|$)/.test(this.url) }
+  // True if this client has never been connected yet.
+  isNew = true
+  kvFilter: Map<string, string[]> = new Map()
+  listeners: ClientEventHandlers = Object.create(null)
+  messageHandlers: MessageHandlers = { ...defaultMessageHandlers }
+  nextConnectionAttemptDelayID?: TimeoutID
+  options: Options = { ...defaultOptions }
+  pendingOperations: TieredMap<RequestTypeEnum, string, object> = new TieredMap()
+  pingTimeoutID?: TimeoutID
+  shouldReconnect = true
+  // The underlying WebSocket object.
+  // A new one is necessary for every connection or reconnection attempt.
+  socket: WebSocket | null = null
+  subscriptionSet: Set<string> = new Set()
+  url = ""
 
-/**
- * Creates a pubsub client instance.
- *
- * @param {string} url - A WebSocket URL to connect to.
- * @param {Object?} options
- * {object?} handlers - Custom handlers for WebSocket events.
- * {boolean?} logPingMessages - Whether to log received pings.
- * {boolean?} manual - Whether the factory should call 'connect()' automatically.
- *   Also named 'autoConnect' or 'startClosed' in other libraries.
- * {object?} messageHandlers - Custom handlers for different message types.
- * {number?} pingTimeout=45_000 - How long to wait for the server to send a ping, in milliseconds.
- * {boolean?} reconnectOnDisconnection=true - Whether to reconnect after a server-side disconnection.
- * {boolean?} reconnectOnOnline=true - Whether to reconnect after coming back online.
- * {boolean?} reconnectOnTimeout=false - Whether to reconnect after a connection timeout.
- * {number?} timeout=5_000 - Connection timeout duration in milliseconds.
- * @returns {PubSubClient}
- */
-export function createClient (url: string, options: Partial<Options> = {}): PubSubClient {
-  const client: PubSubClient = {
-    customEventHandlers: options.handlers || {},
-    // The current number of connection attempts that failed.
-    // Reset to 0 upon successful connection.
-    // Used to compute how long to wait before the next reconnection attempt.
-    failedConnectionAttempts: 0,
-    isLocal: /\/\/(localhost|127\.0\.0\.1)([:?/]|$)/.test(url),
-    // True if this client has never been connected yet.
-    isNew: true,
-    listeners: Object.create(null),
-    messageHandlers: { ...defaultMessageHandlers, ...options.messageHandlers },
-    nextConnectionAttemptDelayID: undefined,
-    options: { ...defaultOptions, ...options },
-    pendingOperations: new TieredMap(),
-    pingTimeoutID: undefined,
-    shouldReconnect: true,
-    // The underlying WebSocket object.
-    // A new one is necessary for every connection or reconnection attempt.
-    socket: null,
-    subscriptionSet: new Set(),
-    kvFilter: new Map(),
-    connectionTimeoutID: undefined,
-    url: url.replace(/^http/, 'ws'),
-    ...publicMethods
-  }
-  // Create and save references to reusable event listeners.
-  // Every time a new underlying WebSocket object will be created for this
-  // client instance, these event listeners will be detached from the older
-  // socket then attached to the new one, hereby avoiding both unnecessary
-  // allocations and garbage collections of a bunch of functions every time.
-  // Another benefit is the ability to patch the client protocol at runtime by
-  // updating the client's custom event handler map.
-  for (const name of Object.keys(
-    defaultClientEventHandlers
-  ) as (keyof typeof defaultClientEventHandlers)[]) {
-    client.listeners[name] = (event) => {
-      try {
-        // Use `.call()` to pass the client via the 'this' binding.
-        (defaultClientEventHandlers[name] as (this: PubSubClient, ev: typeof event) => void).call(
-          client,
-          event
-        );
-        (client.customEventHandlers[name] as (this: PubSubClient, ev: typeof event) => void)?.call(
-          client,
-          event
-        )
-      } catch (error) {
-        // Do not throw any error but emit an `error` event instead.
-        sbp('okTurtles.events/emit', PUBSUB_ERROR, client, (error as Error)?.message)
+  /**
+   *
+   * @param {string} url - A WebSocket URL to connect to.
+   * @param {Partial<Options>} options
+   */
+  constructor (url: string, options: Partial<Options> = {}) {
+    Object.assign(this.customEventHandlers, options.handlers ?? {})
+    Object.assign(this.messageHandlers, options.messageHandlers ?? {})
+    Object.assign(this.options, options ?? {})
+    this.url = url.replace(/^http/, 'ws')
+
+    const client = this
+    // Create and save references to reusable event listeners.
+    // Every time a new underlying WebSocket object will be created for this
+    // client instance, these event listeners will be detached from the older
+    // socket then attached to the new one, hereby avoiding both unnecessary
+    // allocations and garbage collections of a bunch of functions every time.
+    // Another benefit is the ability to patch the client protocol at runtime by
+    // updating the client's custom event handler map.
+    for (const name of Object.keys(
+      defaultClientEventHandlers
+    ) as (keyof typeof defaultClientEventHandlers)[]) {
+      client.listeners[name] = (event) => {
+        try {
+          // Use `.call()` to pass the client via the 'this' binding.
+          (defaultClientEventHandlers[name] as (this: PubsubClient, ev: typeof event) => void).call(
+            client,
+            event
+          );
+          (client.customEventHandlers[name] as (this: PubsubClient, ev: typeof event) => void)?.call(
+            client,
+            event
+          )
+        } catch (error) {
+          // Do not throw any error but emit an `error` event instead.
+          sbp('okTurtles.events/emit', PUBSUB_ERROR, client, (error as Error)?.message)
+        }
       }
     }
+    // Add global event listeners before the first connection.
+    if (typeof self === 'object' && self instanceof EventTarget) {
+      for (const name of globalEventNames) {
+        globalEventMap.set(name, client.listeners[name])
+      }
+    }
+    if (!client.options.manual) {
+      client.connect()
+    }
+    return client
   }
-  // Add global event listeners before the first connection.
-  if (typeof self === 'object' && self instanceof EventTarget) {
-    for (const name of globalEventNames) {
-      globalEventMap.set(name, client.listeners[name])
+
+  clearAllTimers () {
+    const client = this
+
+    clearTimeout(client.connectionTimeoutID)
+    clearTimeout(client.nextConnectionAttemptDelayID)
+    clearTimeout(client.pingTimeoutID)
+    client.connectionTimeoutID = undefined
+    client.nextConnectionAttemptDelayID = undefined
+    client.pingTimeoutID = undefined
+  }
+
+  // Performs a connection or reconnection attempt.
+  connect () {
+    const client = this
+
+    if (client.socket !== null) {
+      throw new Error('connect() can only be called if there is no current socket.')
+    }
+    if (client.nextConnectionAttemptDelayID) {
+      throw new Error('connect() must not be called during a reconnection delay.')
+    }
+    if (!client.shouldReconnect) {
+      throw new Error('connect() should no longer be called on this instance.')
+    }
+    client.socket = new WebSocket(client.url)
+    // Sometimes (like when using `createMessage`), we want to send objects that
+    // are serialized as strings. Native web sockets don't support objects, so
+    // we use this workaround.
+    client.socket.send = function (data) {
+      const send = WebSocket.prototype.send.bind(this)
+      if (
+        typeof data === 'object' &&
+        typeof (data as object as { [Symbol.toPrimitive]?: unknown })[Symbol.toPrimitive] ===
+          'function'
+      ) {
+        return send(
+          (data as object as { [Symbol.toPrimitive]: () => string })[Symbol.toPrimitive]()
+        )
+      }
+      return send(data)
+    }
+
+    if (client.options.timeout) {
+      const start = performance.now()
+      client.connectionTimeoutID = setTimeout(() => {
+        client.connectionTimeoutID = undefined
+        if (client.options.reconnectOnTimeout) {
+          client.connectionTimeUsed = performance.now() - start
+        }
+        client.socket?.close(4000, 'timeout')
+      }, client.options.timeout)
+    }
+    // Attach WebSocket event listeners.
+    for (const name of socketEventNames) {
+      client.socket.addEventListener(name, client.listeners[name] as () => void)
     }
   }
-  if (!client.options.manual) {
-    client.connect()
+
+  /**
+   * Immediately close the socket, stop listening for events and clear any cache.
+   *
+   * This method is used in unit tests.
+   * - In particular, no 'close' event handler will be called.
+   * - Any incoming or outgoing buffered data will be discarded.
+   * - Any pending messages will be discarded.
+   */
+  destroy () {
+    const client = this
+
+    client.clearAllTimers()
+    // Update property values.
+    // Note: do not clear 'client.options'.
+    client.pendingOperations.clear()
+    client.subscriptionSet.clear()
+    // Remove global event listeners.
+    if (typeof self === 'object' && self instanceof EventTarget) {
+      for (const name of globalEventNames) {
+        globalEventMap.delete(name)
+      }
+    }
+    // Remove WebSocket event listeners.
+    if (client.socket) {
+      for (const name of socketEventNames) {
+        client.socket.removeEventListener(name, client.listeners[name] as () => void)
+      }
+      client.socket.close()
+    }
+    client.listeners = Object.create(null)
+    client.socket = null
+    client.shouldReconnect = false
   }
-  return client
+
+  getNextRandomDelay (): number {
+    const client = this
+
+    const { maxReconnectionDelay, minReconnectionDelay, reconnectionDelayGrowFactor } =
+      client.options
+
+    const minDelay =
+      minReconnectionDelay * reconnectionDelayGrowFactor ** client.failedConnectionAttempts
+    const maxDelay = minDelay * reconnectionDelayGrowFactor
+    const connectionTimeUsed = client.connectionTimeUsed
+    client.connectionTimeUsed = 0
+
+    return Math.min(
+      // See issue #1943: Have the connection time used 'eat into' the
+      // reconnection time used
+      Math.max(
+        minReconnectionDelay,
+        connectionTimeUsed ? maxReconnectionDelay - connectionTimeUsed : maxReconnectionDelay
+      ),
+      Math.round(minDelay + (0, Math.random)() * (maxDelay - minDelay))
+    )
+  }
+
+  // Schedules a connection attempt to happen after a delay computed according to
+  // a randomized exponential backoff algorithm variant.
+  scheduleConnectionAttempt () {
+    const client = this
+
+    if (!client.shouldReconnect) {
+      throw new Error('Cannot call `scheduleConnectionAttempt()` when `shouldReconnect` is false.')
+    }
+    if (client.nextConnectionAttemptDelayID) {
+      return console.warn('[pubsub] A reconnection attempt is already scheduled.')
+    }
+    const delay = client.getNextRandomDelay()
+    const nth = client.failedConnectionAttempts + 1
+
+    client.nextConnectionAttemptDelayID = setTimeout(() => {
+      sbp('okTurtles.events/emit', PUBSUB_RECONNECTION_ATTEMPT, client)
+      client.nextConnectionAttemptDelayID = undefined
+      client.connect()
+    }, delay)
+    sbp('okTurtles.events/emit', PUBSUB_RECONNECTION_SCHEDULED, client, { delay, nth })
+  }
+
+  // Can be used to send ephemeral messages outside of any contract log.
+  // Does nothing if the socket is not in the OPEN state.
+  pub (channelID: string, data: JSONType) {
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      this.socket.send(createPubMessage(channelID, data))
+    }
+  }
+
+  /**
+   * Sends a SUB request to the server as soon as possible.
+   *
+   * - The given channel ID will be cached until we get a relevant server
+   * response, allowing us to resend the same request if necessary.
+   * - Any identical UNSUB request that has not been sent yet will be cancelled.
+   * - Calling this method again before the server has responded has no effect.
+   * @param channelID - The ID of the channel whose updates we want to subscribe to.
+   */
+  sub (channelID: string) {
+    const client = this
+
+    // In order to send subscribe to the server, we need to not be already
+    // subscribed (meaning that we've sent REQUEST_TYPE.SUB, confirmed by it
+    // either being a pending operation or having it in `subscriptionSet`).
+    // Whether we've sent an unsubscription request and whether it's been
+    // confirmed isn't relevant.
+    if (
+      !client.pendingOperations.tHas(REQUEST_TYPE.SUB, channelID) &&
+      !client.subscriptionSet.has(channelID)
+    ) {
+      client.pendingOperations.tDelete(REQUEST_TYPE.UNSUB, channelID)
+
+      runWithRetry(client, channelID, REQUEST_TYPE.SUB, pubPayloadFactory(client, channelID))
+    }
+  }
+
+  /**
+   * Sends a KV_FILTER request to the server as soon as possible.
+   */
+  setKvFilter (channelID: string, kvFilter?: string[]) {
+    const client = this
+
+    if (kvFilter) {
+      client.kvFilter.set(channelID, kvFilter)
+    } else {
+      client.kvFilter.delete(channelID)
+    }
+
+    // In order to send KV filter to the server, we need to first be subscribed
+    // (meaning that we've sent REQUEST_TYPE.SUB, confirmed by it either being
+    // a pending operation or having it in `subscriptionSet`), and we also want
+    // to ensure that we've not already sent REQUEST_TYPE.UNSUB.
+    // Note that KV filter requires that a subscription exists for it to work,
+    // and therefore we don't send anything if the subscription is pending
+    // (unconfirmed). Instead, setting the KV filter in these cases will
+    // be done in the `RESPONSE_TYPE.OK` function for REQUEST_TYPE.SUB.
+    if (
+      client.subscriptionSet.has(channelID) &&
+      !client.pendingOperations.tHas(REQUEST_TYPE.UNSUB, channelID)
+    ) {
+      runWithRetry(client, channelID, REQUEST_TYPE.KV_FILTER, pubPayloadFactory(client, channelID))
+    }
+  }
+
+  /**
+   * Sends an UNSUB request to the server as soon as possible.
+   *
+   * - The given channel ID will be cached until we get a relevant server
+   * response, allowing us to resend the same request if necessary.
+   * - Any identical SUB request that has not been sent yet will be cancelled.
+   * - Calling this method again before the server has responded has no effect.
+   * @param channelID - The ID of the channel whose updates we want to unsubscribe from.
+   */
+  unsub (channelID: string) {
+    const client = this
+
+    // In order to send unsubscribe to the server, we need to first be subscribed
+    // (meaning that we've sent REQUEST_TYPE.SUB, confirmed by it either being
+    // a pending operation or having it in `subscriptionSet`), and we also want
+    // to ensure that we've not already sent REQUEST_TYPE.UNSUB.
+    if (
+      !client.pendingOperations.tHas(REQUEST_TYPE.UNSUB, channelID) &&
+      (
+        client.subscriptionSet.has(channelID) ||
+        client.pendingOperations.tHas(REQUEST_TYPE.SUB, channelID)
+      )
+    ) {
+      client.pendingOperations.tDelete(REQUEST_TYPE.SUB, channelID)
+      client.kvFilter.delete(channelID)
+
+      runWithRetry(client, channelID, REQUEST_TYPE.UNSUB, () => ({ channelID }))
+    }
+  }
 }
 
 export function createMessage (
@@ -579,7 +782,7 @@ const defaultClientEventHandlers: ClientEventHandlers = {
     const client = this
     const { options } = this
 
-    client.connectionTimeUsed = undefined
+    client.connectionTimeUsed = 0
     client.clearAllTimers()
     sbp('okTurtles.events/emit', PUBSUB_RECONNECTION_SUCCEEDED, client)
 
@@ -789,251 +992,11 @@ export const messageParser = (data: string): Message => {
   return msg
 }
 
-const publicMethods: {
-  clearAllTimers(this: PubSubClient): void;
-  connect(this: PubSubClient): void;
-  destroy(this: PubSubClient): void;
-  pub(this: PubSubClient, channelID: string, data: JSONType): void;
-  scheduleConnectionAttempt(this: PubSubClient): void;
-  sub(this: PubSubClient, channelID: string): void;
-  setKvFilter(this: PubSubClient, channelID: string, kvFilter?: string[]): void;
-  unsub(this: PubSubClient, channelID: string): void;
-  getNextRandomDelay(this: PubSubClient): number;
-} = {
-  clearAllTimers () {
-    const client = this
-
-    clearTimeout(client.connectionTimeoutID)
-    clearTimeout(client.nextConnectionAttemptDelayID)
-    clearTimeout(client.pingTimeoutID)
-    client.connectionTimeoutID = undefined
-    client.nextConnectionAttemptDelayID = undefined
-    client.pingTimeoutID = undefined
-  },
-
-  // Performs a connection or reconnection attempt.
-  connect () {
-    const client = this
-
-    if (client.socket !== null) {
-      throw new Error('connect() can only be called if there is no current socket.')
-    }
-    if (client.nextConnectionAttemptDelayID) {
-      throw new Error('connect() must not be called during a reconnection delay.')
-    }
-    if (!client.shouldReconnect) {
-      throw new Error('connect() should no longer be called on this instance.')
-    }
-    client.socket = new WebSocket(client.url)
-    // Sometimes (like when using `createMessage`), we want to send objects that
-    // are serialized as strings. Native web sockets don't support objects, so
-    // we use this workaround.
-    client.socket.send = function (data) {
-      const send = WebSocket.prototype.send.bind(this)
-      if (
-        typeof data === 'object' &&
-        typeof (data as object as { [Symbol.toPrimitive]?: unknown })[Symbol.toPrimitive] ===
-          'function'
-      ) {
-        return send(
-          (data as object as { [Symbol.toPrimitive]: () => string })[Symbol.toPrimitive]()
-        )
-      }
-      return send(data)
-    }
-
-    if (client.options.timeout) {
-      const start = performance.now()
-      client.connectionTimeoutID = setTimeout(() => {
-        client.connectionTimeoutID = undefined
-        if (client.options.reconnectOnTimeout) {
-          client.connectionTimeUsed = performance.now() - start
-        }
-        client.socket?.close(4000, 'timeout')
-      }, client.options.timeout)
-    }
-    // Attach WebSocket event listeners.
-    for (const name of socketEventNames) {
-      client.socket.addEventListener(name, client.listeners[name] as () => void)
-    }
-  },
-
-  /**
-   * Immediately close the socket, stop listening for events and clear any cache.
-   *
-   * This method is used in unit tests.
-   * - In particular, no 'close' event handler will be called.
-   * - Any incoming or outgoing buffered data will be discarded.
-   * - Any pending messages will be discarded.
-   */
-  destroy () {
-    const client = this
-
-    client.clearAllTimers()
-    // Update property values.
-    // Note: do not clear 'client.options'.
-    client.pendingOperations.clear()
-    client.subscriptionSet.clear()
-    // Remove global event listeners.
-    if (typeof self === 'object' && self instanceof EventTarget) {
-      for (const name of globalEventNames) {
-        globalEventMap.delete(name)
-      }
-    }
-    // Remove WebSocket event listeners.
-    if (client.socket) {
-      for (const name of socketEventNames) {
-        client.socket.removeEventListener(name, client.listeners[name] as () => void)
-      }
-      client.socket.close()
-    }
-    client.listeners = Object.create(null)
-    client.socket = null
-    client.shouldReconnect = false
-  },
-
-  getNextRandomDelay (): number {
-    const client = this
-
-    const { maxReconnectionDelay, minReconnectionDelay, reconnectionDelayGrowFactor } =
-      client.options
-
-    const minDelay =
-      minReconnectionDelay * reconnectionDelayGrowFactor ** client.failedConnectionAttempts
-    const maxDelay = minDelay * reconnectionDelayGrowFactor
-    const connectionTimeUsed = client.connectionTimeUsed
-    client.connectionTimeUsed = undefined
-
-    return Math.min(
-      // See issue #1943: Have the connection time used 'eat into' the
-      // reconnection time used
-      Math.max(
-        minReconnectionDelay,
-        connectionTimeUsed ? maxReconnectionDelay - connectionTimeUsed : maxReconnectionDelay
-      ),
-      Math.round(minDelay + (0, Math.random)() * (maxDelay - minDelay))
-    )
-  },
-
-  // Schedules a connection attempt to happen after a delay computed according to
-  // a randomized exponential backoff algorithm variant.
-  scheduleConnectionAttempt () {
-    const client = this
-
-    if (!client.shouldReconnect) {
-      throw new Error('Cannot call `scheduleConnectionAttempt()` when `shouldReconnect` is false.')
-    }
-    if (client.nextConnectionAttemptDelayID) {
-      return console.warn('[pubsub] A reconnection attempt is already scheduled.')
-    }
-    const delay = client.getNextRandomDelay()
-    const nth = client.failedConnectionAttempts + 1
-
-    client.nextConnectionAttemptDelayID = setTimeout(() => {
-      sbp('okTurtles.events/emit', PUBSUB_RECONNECTION_ATTEMPT, client)
-      client.nextConnectionAttemptDelayID = undefined
-      client.connect()
-    }, delay)
-    sbp('okTurtles.events/emit', PUBSUB_RECONNECTION_SCHEDULED, client, { delay, nth })
-  },
-
-  // Can be used to send ephemeral messages outside of any contract log.
-  // Does nothing if the socket is not in the OPEN state.
-  pub (channelID: string, data: JSONType) {
-    if (this.socket?.readyState === WebSocket.OPEN) {
-      this.socket.send(createPubMessage(channelID, data))
-    }
-  },
-  /**
-   * Sends a SUB request to the server as soon as possible.
-   *
-   * - The given channel ID will be cached until we get a relevant server
-   * response, allowing us to resend the same request if necessary.
-   * - Any identical UNSUB request that has not been sent yet will be cancelled.
-   * - Calling this method again before the server has responded has no effect.
-   * @param channelID - The ID of the channel whose updates we want to subscribe to.
-   */
-  sub (channelID: string) {
-    const client = this
-
-    // In order to send subscribe to the server, we need to not be already
-    // subscribed (meaning that we've sent REQUEST_TYPE.SUB, confirmed by it
-    // either being a pending operation or having it in `subscriptionSet`).
-    // Whether we've sent an unsubscription request and whether it's been
-    // confirmed isn't relevant.
-    if (
-      !client.pendingOperations.tHas(REQUEST_TYPE.SUB, channelID) &&
-      !client.subscriptionSet.has(channelID)
-    ) {
-      client.pendingOperations.tDelete(REQUEST_TYPE.UNSUB, channelID)
-
-      runWithRetry(client, channelID, REQUEST_TYPE.SUB, pubPayloadFactory(client, channelID))
-    }
-  },
-
-  /**
-   * Sends a KV_FILTER request to the server as soon as possible.
-   */
-  setKvFilter (channelID: string, kvFilter?: string[]) {
-    const client = this
-
-    if (kvFilter) {
-      client.kvFilter.set(channelID, kvFilter)
-    } else {
-      client.kvFilter.delete(channelID)
-    }
-
-    // In order to send KV filter to the server, we need to first be subscribed
-    // (meaning that we've sent REQUEST_TYPE.SUB, confirmed by it either being
-    // a pending operation or having it in `subscriptionSet`), and we also want
-    // to ensure that we've not already sent REQUEST_TYPE.UNSUB.
-    // Note that KV filter requires that a subscription exists for it to work,
-    // and therefore we don't send anything if the subscription is pending
-    // (unconfirmed). Instead, setting the KV filter in these cases will
-    // be done in the `RESPONSE_TYPE.OK` function for REQUEST_TYPE.SUB.
-    if (
-      client.subscriptionSet.has(channelID) &&
-      !client.pendingOperations.tHas(REQUEST_TYPE.UNSUB, channelID)
-    ) {
-      runWithRetry(client, channelID, REQUEST_TYPE.KV_FILTER, pubPayloadFactory(client, channelID))
-    }
-  },
-
-  /**
-   * Sends an UNSUB request to the server as soon as possible.
-   *
-   * - The given channel ID will be cached until we get a relevant server
-   * response, allowing us to resend the same request if necessary.
-   * - Any identical SUB request that has not been sent yet will be cancelled.
-   * - Calling this method again before the server has responded has no effect.
-   * @param channelID - The ID of the channel whose updates we want to unsubscribe from.
-   */
-  unsub (channelID: string) {
-    const client = this
-
-    // In order to send unsubscribe to the server, we need to first be subscribed
-    // (meaning that we've sent REQUEST_TYPE.SUB, confirmed by it either being
-    // a pending operation or having it in `subscriptionSet`), and we also want
-    // to ensure that we've not already sent REQUEST_TYPE.UNSUB.
-    if (
-      !client.pendingOperations.tHas(REQUEST_TYPE.UNSUB, channelID) &&
-      (
-        client.subscriptionSet.has(channelID) ||
-        client.pendingOperations.tHas(REQUEST_TYPE.SUB, channelID)
-      )
-    ) {
-      client.pendingOperations.tDelete(REQUEST_TYPE.SUB, channelID)
-      client.kvFilter.delete(channelID)
-
-      runWithRetry(client, channelID, REQUEST_TYPE.UNSUB, () => ({ channelID }))
-    }
-  }
-}
 
 // Register custom SBP event listeners before the first connection.
 for (const name of Object.keys(defaultClientEventHandlers)) {
   if (name === 'error' || !(socketEventNames as readonly string[]).includes(name)) {
-    sbp('okTurtles.events/on', `pubsub-${name}`, (target: PubSubClient, detail?: object) => {
+    sbp('okTurtles.events/on', `pubsub-${name}`, (target: PubsubClient, detail?: object) => {
       const ev = new CustomEvent(name, { detail });
       (
         target.listeners[name as keyof ClientEventHandlers] as (
@@ -1043,13 +1006,4 @@ for (const name of Object.keys(defaultClientEventHandlers)) {
       ).call(target, ev)
     })
   }
-}
-
-export default {
-  NOTIFICATION_TYPE,
-  REQUEST_TYPE,
-  RESPONSE_TYPE,
-  createClient,
-  createMessage,
-  createRequest
 }

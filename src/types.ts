@@ -4,7 +4,7 @@ import type { Key } from '@chelonia/crypto'
 import type sbp from '@sbp/sbp'
 import type { SPMessage, SPMsgDirection, SPOpType } from './SPMessage.js'
 import type { EncryptedData } from './encryptedData.js'
-import type { PubSubClient } from './pubsub/index.js'
+import type PubsubClient from './pubsub/index.js'
 import type { SignedDataContext } from './signedData.js'
 import type {
   KV_AUTO_LOAD,
@@ -86,7 +86,7 @@ export type CheloniaConfig = {
     sideEffectError: { (e: unknown, message?: SPMessage): void } | null;
     handleEventError: { (e: unknown, message?: SPMessage): void } | null;
     syncContractError: { (e: unknown, contractID: string): void } | null;
-    pubsubError: { (e: unknown, socket: PubSubClient): void } | null;
+    pubsubError: { (e: unknown, socket: PubsubClient): void } | null;
   }>;
   skipDecryptionAttempts: boolean;
   unwrapMaybeEncryptedData: <T>(data: T | EncryptedData<T>) =>
@@ -387,12 +387,12 @@ export type CheloniaContext = {
   ephemeralReferenceCount: Record<string, number>;
   subscriptionSet: Set<string>;
   pending: { contractID: string }[];
-  pubsub: import('./pubsub/index.js').PubSubClient;
+  pubsub: PubsubClient;
   contractsModifiedListener: (
     contracts: string[],
     { added, removed }: { added: string[]; removed: string[] },
   ) => void;
-  kvReconnectListener?: (client: import('./pubsub/index.js').PubSubClient) => void;
+  kvReconnectListener?: (client: PubsubClient) => void;
   kvContractsModifiedListener?: (
     contracts: string[],
     { added, removed }: { added: string[]; removed: string[] },
