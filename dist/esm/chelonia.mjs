@@ -4,7 +4,7 @@ import sbp from '@sbp/sbp';
 import { cloneDeep, delay, difference, has, intersection, merge, randomHexString, randomIntFromRange } from 'turtledash';
 import { createCID, maybeParseCID, multicodes, parseCID } from './functions.mjs';
 import { Buffer } from 'buffer';
-import { NOTIFICATION_TYPE, PUBSUB_RECONNECTION_SUCCEEDED, default as PubsubClient } from './pubsub/index.mjs';
+import { DELETION, ENTRY, KV, PUB, PUBSUB_RECONNECTION_SUCCEEDED, default as PubsubClient } from './pubsub/index.mjs';
 import { clearReingestTrackerAll } from './reingestTracker.mjs';
 import { EDWARDS25519SHA512BATCH, deserializeKey, keyId, keygen, serializeKey } from '@chelonia/crypto';
 import { ChelErrorInvalidMessageHeight, ChelErrorResourceGone, ChelErrorUnexpected, ChelErrorUnexpectedHttpResponseCode, ChelErrorUnrecoverable } from './errors.mjs';
@@ -762,7 +762,7 @@ export default sbp('sbp/selectors/register', {
             sbp('chelonia/private/stopClockSync');
         }
         sbp('chelonia/private/startClockSync');
-        const rawKvHandler = options.messageHandlers?.[NOTIFICATION_TYPE.KV];
+        const rawKvHandler = options.messageHandlers?.[KV];
         this.pubsub = new PubsubClient({
             ...this.config.connectionOptions,
             handlers: {
@@ -792,7 +792,7 @@ export default sbp('sbp/selectors/register', {
             messageHandlers: {
                 ...Object.fromEntries(Object.entries(options.messageHandlers || {}).map(([k, v]) => {
                     switch (k) {
-                        case NOTIFICATION_TYPE.PUB:
+                        case PUB:
                             return [
                                 k,
                                 (msg) => {
@@ -814,7 +814,7 @@ export default sbp('sbp/selectors/register', {
                                     });
                                 }
                             ];
-                        case NOTIFICATION_TYPE.DELETION:
+                        case DELETION:
                             return [
                                 k,
                                 (msg) => v.call(this.pubsub, msg.data)
@@ -823,7 +823,7 @@ export default sbp('sbp/selectors/register', {
                             return [k, v];
                     }
                 })),
-                [NOTIFICATION_TYPE.KV]: (msg) => {
+                [KV]: (msg) => {
                     if (!msg.channelID || !msg.key) {
                         console.warn('[chelonia] Discarding kv event without channelID or key');
                         return;
@@ -877,7 +877,7 @@ export default sbp('sbp/selectors/register', {
                         console.error(`[chelonia] Error processing kv event for ${msg.channelID} and key ${msg.key}`, msg, e);
                     });
                 },
-                [NOTIFICATION_TYPE.ENTRY](msg) {
+                [ENTRY](msg) {
                     // We MUST use 'chelonia/private/in/enqueueHandleEvent' to ensure handleEvent()
                     // is called AFTER any currently-running calls to 'chelonia/private/in/sync'
                     // to prevent gi.db from throwing "bad previousHEAD" errors.

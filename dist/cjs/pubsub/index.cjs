@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.messageParser = exports.PUBSUB_SUBSCRIPTION_SUCCEEDED = exports.PUBSUB_RECONNECTION_SUCCEEDED = exports.PUBSUB_RECONNECTION_SCHEDULED = exports.PUBSUB_RECONNECTION_FAILED = exports.PUBSUB_RECONNECTION_ATTEMPT = exports.PUBSUB_ERROR = exports.PUSH_SERVER_ACTION_TYPE = exports.RESPONSE_TYPE = exports.REQUEST_TYPE = exports.NOTIFICATION_TYPE = void 0;
+exports.messageParser = exports.PUBSUB_SUBSCRIPTION_SUCCEEDED = exports.PUBSUB_RECONNECTION_SUCCEEDED = exports.PUBSUB_RECONNECTION_SCHEDULED = exports.PUBSUB_RECONNECTION_FAILED = exports.PUBSUB_RECONNECTION_ATTEMPT = exports.PUBSUB_ERROR = exports.VERSION_INFO = exports.UNSUB = exports.SUB = exports.PUSH_ACTION = exports.PUB = exports.PONG = exports.PING = exports.OK = exports.KV_FILTER = exports.KV = exports.ERROR = exports.ENTRY = exports.DELETION = void 0;
 exports.createMessage = createMessage;
 exports.createKvMessage = createKvMessage;
 exports.createPubMessage = createPubMessage;
@@ -12,36 +12,20 @@ exports.createRequest = createRequest;
 require("@sbp/okturtles.events");
 const sbp_1 = __importDefault(require("@sbp/sbp"));
 const turtledash_1 = require("turtledash");
-// ====== Enums ====== //
-exports.NOTIFICATION_TYPE = Object.freeze({
-    ENTRY: 'entry',
-    DELETION: 'deletion',
-    KV: 'kv',
-    KV_FILTER: 'kv_filter',
-    PING: 'ping',
-    PONG: 'pong',
-    PUB: 'pub',
-    SUB: 'sub',
-    UNSUB: 'unsub',
-    VERSION_INFO: 'version_info'
-});
-exports.REQUEST_TYPE = Object.freeze({
-    PUB: 'pub',
-    SUB: 'sub',
-    UNSUB: 'unsub',
-    PUSH_ACTION: 'push_action',
-    KV_FILTER: 'kv_filter'
-});
-exports.RESPONSE_TYPE = Object.freeze({
-    ERROR: 'error',
-    OK: 'ok'
-});
-exports.PUSH_SERVER_ACTION_TYPE = Object.freeze({
-    SEND_PUBLIC_KEY: 'send-public-key',
-    STORE_SUBSCRIPTION: 'store-subscription',
-    DELETE_SUBSCRIPTION: 'delete-subscription',
-    SEND_PUSH_NOTIFICATION: 'send-push-notification'
-});
+// ====== Constants ====== //
+exports.DELETION = 'deletion';
+exports.ENTRY = 'entry';
+exports.ERROR = 'error';
+exports.KV = 'kv';
+exports.KV_FILTER = 'kv_filter';
+exports.OK = 'ok';
+exports.PING = 'ping';
+exports.PONG = 'pong';
+exports.PUB = 'pub';
+exports.PUSH_ACTION = 'push_action';
+exports.SUB = 'sub';
+exports.UNSUB = 'unsub';
+exports.VERSION_INFO = 'version_info';
 // ====== Event name constants ====== //
 exports.PUBSUB_ERROR = 'pubsub-error';
 exports.PUBSUB_RECONNECTION_ATTEMPT = 'pubsub-reconnection-attempt';
@@ -361,14 +345,14 @@ class PubsubClient {
     sub(channelID) {
         const client = this;
         // In order to send subscribe to the server, we need to not be already
-        // subscribed (meaning that we've sent REQUEST_TYPE.SUB, confirmed by it
+        // subscribed (meaning that we've sent SUB, confirmed by it
         // either being a pending operation or having it in `subscriptionSet`).
         // Whether we've sent an unsubscription request and whether it's been
         // confirmed isn't relevant.
-        if (!client.pendingOperations.tHas(exports.REQUEST_TYPE.SUB, channelID) &&
+        if (!client.pendingOperations.tHas(exports.SUB, channelID) &&
             !client.subscriptionSet.has(channelID)) {
-            client.pendingOperations.tDelete(exports.REQUEST_TYPE.UNSUB, channelID);
-            runWithRetry(client, channelID, exports.REQUEST_TYPE.SUB, pubPayloadFactory(client, channelID));
+            client.pendingOperations.tDelete(exports.UNSUB, channelID);
+            runWithRetry(client, channelID, exports.SUB, pubPayloadFactory(client, channelID));
         }
     }
     /**
@@ -383,16 +367,16 @@ class PubsubClient {
             client.kvFilter.delete(channelID);
         }
         // In order to send KV filter to the server, we need to first be subscribed
-        // (meaning that we've sent REQUEST_TYPE.SUB, confirmed by it either being
+        // (meaning that we've sent SUB, confirmed by it either being
         // a pending operation or having it in `subscriptionSet`), and we also want
-        // to ensure that we've not already sent REQUEST_TYPE.UNSUB.
+        // to ensure that we've not already sent UNSUB.
         // Note that KV filter requires that a subscription exists for it to work,
         // and therefore we don't send anything if the subscription is pending
         // (unconfirmed). Instead, setting the KV filter in these cases will
-        // be done in the `RESPONSE_TYPE.OK` function for REQUEST_TYPE.SUB.
+        // be done in the `OK` function for SUB.
         if (client.subscriptionSet.has(channelID) &&
-            !client.pendingOperations.tHas(exports.REQUEST_TYPE.UNSUB, channelID)) {
-            runWithRetry(client, channelID, exports.REQUEST_TYPE.KV_FILTER, pubPayloadFactory(client, channelID));
+            !client.pendingOperations.tHas(exports.UNSUB, channelID)) {
+            runWithRetry(client, channelID, exports.KV_FILTER, pubPayloadFactory(client, channelID));
         }
     }
     /**
@@ -407,15 +391,15 @@ class PubsubClient {
     unsub(channelID) {
         const client = this;
         // In order to send unsubscribe to the server, we need to first be subscribed
-        // (meaning that we've sent REQUEST_TYPE.SUB, confirmed by it either being
+        // (meaning that we've sent SUB, confirmed by it either being
         // a pending operation or having it in `subscriptionSet`), and we also want
-        // to ensure that we've not already sent REQUEST_TYPE.UNSUB.
-        if (!client.pendingOperations.tHas(exports.REQUEST_TYPE.UNSUB, channelID) &&
+        // to ensure that we've not already sent UNSUB.
+        if (!client.pendingOperations.tHas(exports.UNSUB, channelID) &&
             (client.subscriptionSet.has(channelID) ||
-                client.pendingOperations.tHas(exports.REQUEST_TYPE.SUB, channelID))) {
-            client.pendingOperations.tDelete(exports.REQUEST_TYPE.SUB, channelID);
+                client.pendingOperations.tHas(exports.SUB, channelID))) {
+            client.pendingOperations.tDelete(exports.SUB, channelID);
             client.kvFilter.delete(channelID);
-            runWithRetry(client, channelID, exports.REQUEST_TYPE.UNSUB, () => ({ channelID }));
+            runWithRetry(client, channelID, exports.UNSUB, () => ({ channelID }));
         }
     }
 }
@@ -436,10 +420,10 @@ function createMessage(type, data, meta) {
     return message;
 }
 function createKvMessage(channelID, key, data, cid) {
-    return JSON.stringify({ type: exports.NOTIFICATION_TYPE.KV, channelID, key, data, cid });
+    return JSON.stringify({ type: exports.KV, channelID, key, data, cid });
 }
 function createPubMessage(channelID, data) {
-    return JSON.stringify({ type: exports.NOTIFICATION_TYPE.PUB, channelID, data });
+    return JSON.stringify({ type: exports.PUB, channelID, data });
 }
 function createRequest(type, data) {
     // Had to use Object.assign() instead of object spreading to make Flow happy.
@@ -482,7 +466,7 @@ const defaultClientEventHandlers = {
             // to a different instance value. Deleting values from
             // `pendingSubscriptionMap` could also work, but then we'd need to save
             // the list of existing keys somewhere else.
-            const pendingSubscriptionMap = client.pendingOperations.get(exports.REQUEST_TYPE.SUB);
+            const pendingSubscriptionMap = client.pendingOperations.get(exports.SUB);
             if (pendingSubscriptionMap) {
                 for (const [channelID] of pendingSubscriptionMap) {
                     pendingSubscriptionMap.set(channelID, {});
@@ -490,15 +474,15 @@ const defaultClientEventHandlers = {
             }
             client.subscriptionSet.forEach((channelID) => {
                 // Skip contracts from which we had to unsubscribe anyway.
-                if (!client.pendingOperations.tHas(exports.REQUEST_TYPE.UNSUB, channelID)) {
-                    client.pendingOperations.tSet(exports.REQUEST_TYPE.SUB, channelID, {});
+                if (!client.pendingOperations.tHas(exports.UNSUB, channelID)) {
+                    client.pendingOperations.tSet(exports.SUB, channelID, {});
                 }
             });
         }
         // We are no longer subscribed to any contracts since we are now disconnected.
         client.subscriptionSet.clear();
-        client.pendingOperations.tClear(exports.REQUEST_TYPE.UNSUB);
-        client.pendingOperations.tClear(exports.REQUEST_TYPE.KV_FILTER);
+        client.pendingOperations.tClear(exports.UNSUB);
+        client.pendingOperations.tClear(exports.KV_FILTER);
         if (client.shouldReconnect && client.options.reconnectOnDisconnection) {
             if (client.failedConnectionAttempts > client.options.maxRetries) {
                 (0, sbp_1.default)('okTurtles.events/emit', exports.PUBSUB_RECONNECTION_FAILED, client);
@@ -589,8 +573,8 @@ const defaultClientEventHandlers = {
             }, options.pingTimeout);
         }
         // Send any pending subscription request.
-        for (const [channelID] of client.pendingOperations.get(exports.REQUEST_TYPE.SUB) || []) {
-            runWithRetry(client, channelID, exports.REQUEST_TYPE.SUB, pubPayloadFactory(client, channelID));
+        for (const [channelID] of client.pendingOperations.get(exports.SUB) || []) {
+            runWithRetry(client, channelID, exports.SUB, pubPayloadFactory(client, channelID));
         }
         // There should be no pending unsubscription since we just got connected.
     },
@@ -616,10 +600,10 @@ const defaultClientEventHandlers = {
 };
 // These handlers receive the PubSubClient instance through the `this` binding.
 const defaultMessageHandlers = {
-    [exports.NOTIFICATION_TYPE.ENTRY](msg) {
+    [exports.ENTRY](msg) {
         console.debug('[pubsub] Received ENTRY:', msg);
     },
-    [exports.NOTIFICATION_TYPE.PING]({ data }) {
+    [exports.PING]({ data }) {
         const client = this;
         if (client.options.logPingMessages) {
             console.debug(`[pubsub] Ping received in ${Date.now() - Number(data)} ms`);
@@ -627,50 +611,50 @@ const defaultMessageHandlers = {
         // Reply with a pong message using the same data.
         // TODO: Type coercion to string because we actually support passing this
         // object type, but the correct TypeScript type hasn't been written.
-        client.socket?.send(createMessage(exports.NOTIFICATION_TYPE.PONG, data));
+        client.socket?.send(createMessage(exports.PONG, data));
         // Refresh the ping timer, waiting for the next ping.
         clearTimeout(client.pingTimeoutID);
         client.pingTimeoutID = setTimeout(() => {
             client.socket?.close();
         }, client.options.pingTimeout);
     },
-    [exports.NOTIFICATION_TYPE.PUB]({ channelID, data }) {
+    [exports.PUB]({ channelID, data }) {
         console.log(`[pubsub] Received data from channel ${channelID}:`, data);
         // No need to reply.
     },
-    [exports.NOTIFICATION_TYPE.KV]({ channelID, key, data }) {
+    [exports.KV]({ channelID, key, data }) {
         console.log(`[pubsub] Received KV update from channel ${channelID} ${key}:`, data);
         // No need to reply.
     },
-    [exports.NOTIFICATION_TYPE.SUB](msg) {
+    [exports.SUB](msg) {
         console.debug(`[pubsub] Ignoring ${msg.type} message:`, msg.data);
     },
-    [exports.NOTIFICATION_TYPE.UNSUB](msg) {
+    [exports.UNSUB](msg) {
         console.debug(`[pubsub] Ignoring ${msg.type} message:`, msg.data);
     },
-    [exports.RESPONSE_TYPE.ERROR]({ data }) {
+    [exports.ERROR]({ data }) {
         const { type, channelID, reason } = data;
         console.warn(`[pubsub] Received ERROR response for ${type} request to ${channelID}`);
         const client = this;
         switch (type) {
-            case exports.REQUEST_TYPE.SUB: {
+            case exports.SUB: {
                 console.warn(`[pubsub] Could not subscribe to ${channelID}: ${reason}`);
-                client.pendingOperations.tDelete(exports.REQUEST_TYPE.SUB, channelID);
+                client.pendingOperations.tDelete(exports.SUB, channelID);
                 break;
             }
-            case exports.REQUEST_TYPE.UNSUB: {
+            case exports.UNSUB: {
                 console.warn(`[pubsub] Could not unsubscribe from ${channelID}: ${reason}`);
-                client.pendingOperations.tDelete(exports.REQUEST_TYPE.UNSUB, channelID);
+                client.pendingOperations.tDelete(exports.UNSUB, channelID);
                 break;
             }
-            case exports.REQUEST_TYPE.PUSH_ACTION: {
+            case exports.PUSH_ACTION: {
                 const { actionType, message } = data;
                 console.warn(`[pubsub] Received ERROR for PUSH_ACTION request with the action type '${actionType}' and the following message: ${message}`);
                 break;
             }
-            case exports.REQUEST_TYPE.KV_FILTER: {
+            case exports.KV_FILTER: {
                 console.warn(`[pubsub] Could not set KV filter for ${channelID}: ${reason}`);
-                client.pendingOperations.tDelete(exports.REQUEST_TYPE.KV_FILTER, channelID);
+                client.pendingOperations.tDelete(exports.KV_FILTER, channelID);
                 break;
             }
             default: {
@@ -678,12 +662,12 @@ const defaultMessageHandlers = {
             }
         }
     },
-    [exports.RESPONSE_TYPE.OK]({ data: { type, channelID, kvFilter } }) {
+    [exports.OK]({ data: { type, channelID, kvFilter } }) {
         const client = this;
         switch (type) {
-            case exports.REQUEST_TYPE.SUB: {
-                if (client.pendingOperations.tHas(exports.REQUEST_TYPE.SUB, channelID)) {
-                    client.pendingOperations.tDelete(exports.REQUEST_TYPE.SUB, channelID);
+            case exports.SUB: {
+                if (client.pendingOperations.tHas(exports.SUB, channelID)) {
+                    client.pendingOperations.tDelete(exports.SUB, channelID);
                     client.subscriptionSet.add(channelID);
                     (0, sbp_1.default)('okTurtles.events/emit', exports.PUBSUB_SUBSCRIPTION_SUCCEEDED, client, { channelID });
                     const ourKvFilter = client.kvFilter.get(channelID);
@@ -697,10 +681,10 @@ const defaultMessageHandlers = {
                 }
                 break;
             }
-            case exports.REQUEST_TYPE.UNSUB: {
-                if (client.pendingOperations.tHas(exports.REQUEST_TYPE.UNSUB, channelID)) {
+            case exports.UNSUB: {
+                if (client.pendingOperations.tHas(exports.UNSUB, channelID)) {
                     console.debug(`[pubsub] Unsubscribed from ${channelID}`);
-                    client.pendingOperations.tDelete(exports.REQUEST_TYPE.UNSUB, channelID);
+                    client.pendingOperations.tDelete(exports.UNSUB, channelID);
                     client.subscriptionSet.delete(channelID);
                 }
                 else {
@@ -708,12 +692,12 @@ const defaultMessageHandlers = {
                 }
                 break;
             }
-            case exports.REQUEST_TYPE.KV_FILTER: {
-                if (client.pendingOperations.tHas(exports.REQUEST_TYPE.KV_FILTER, channelID)) {
+            case exports.KV_FILTER: {
+                if (client.pendingOperations.tHas(exports.KV_FILTER, channelID)) {
                     const ourKvFilter = client.kvFilter.get(channelID);
                     if (isKvFilterFresh(ourKvFilter, kvFilter)) {
                         console.debug(`[pubsub] Set KV filter for ${channelID}`, kvFilter);
-                        client.pendingOperations.tDelete(exports.REQUEST_TYPE.KV_FILTER, channelID);
+                        client.pendingOperations.tDelete(exports.KV_FILTER, channelID);
                     }
                     else {
                         console.debug(`[pubsub] Received stale KV filter ack for ${channelID}`, kvFilter, ourKvFilter);

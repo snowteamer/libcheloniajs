@@ -801,7 +801,7 @@ exports.default = (0, sbp_1.default)('sbp/selectors/register', {
             (0, sbp_1.default)('chelonia/private/stopClockSync');
         }
         (0, sbp_1.default)('chelonia/private/startClockSync');
-        const rawKvHandler = options.messageHandlers?.[index_js_1.NOTIFICATION_TYPE.KV];
+        const rawKvHandler = options.messageHandlers?.[index_js_1.KV];
         this.pubsub = new index_js_1.default({
             ...this.config.connectionOptions,
             handlers: {
@@ -831,7 +831,7 @@ exports.default = (0, sbp_1.default)('sbp/selectors/register', {
             messageHandlers: {
                 ...Object.fromEntries(Object.entries(options.messageHandlers || {}).map(([k, v]) => {
                     switch (k) {
-                        case index_js_1.NOTIFICATION_TYPE.PUB:
+                        case index_js_1.PUB:
                             return [
                                 k,
                                 (msg) => {
@@ -853,7 +853,7 @@ exports.default = (0, sbp_1.default)('sbp/selectors/register', {
                                     });
                                 }
                             ];
-                        case index_js_1.NOTIFICATION_TYPE.DELETION:
+                        case index_js_1.DELETION:
                             return [
                                 k,
                                 (msg) => v.call(this.pubsub, msg.data)
@@ -862,7 +862,7 @@ exports.default = (0, sbp_1.default)('sbp/selectors/register', {
                             return [k, v];
                     }
                 })),
-                [index_js_1.NOTIFICATION_TYPE.KV]: (msg) => {
+                [index_js_1.KV]: (msg) => {
                     if (!msg.channelID || !msg.key) {
                         console.warn('[chelonia] Discarding kv event without channelID or key');
                         return;
@@ -916,7 +916,7 @@ exports.default = (0, sbp_1.default)('sbp/selectors/register', {
                         console.error(`[chelonia] Error processing kv event for ${msg.channelID} and key ${msg.key}`, msg, e);
                     });
                 },
-                [index_js_1.NOTIFICATION_TYPE.ENTRY](msg) {
+                [index_js_1.ENTRY](msg) {
                     // We MUST use 'chelonia/private/in/enqueueHandleEvent' to ensure handleEvent()
                     // is called AFTER any currently-running calls to 'chelonia/private/in/sync'
                     // to prevent gi.db from throwing "bad previousHEAD" errors.

@@ -13,7 +13,7 @@ import {
 } from 'turtledash'
 import { createCID, maybeParseCID, multicodes, parseCID } from './functions.js'
 import { Buffer } from 'buffer'
-import { NOTIFICATION_TYPE, PUBSUB_RECONNECTION_SUCCEEDED, default as PubsubClient } from './pubsub/index.js'
+import { DELETION, ENTRY, KV, PUB, PUBSUB_RECONNECTION_SUCCEEDED, default as PubsubClient } from './pubsub/index.js'
 import { clearReingestTrackerAll } from './reingestTracker.js'
 import type {
   ProtoSPOpKeyRequestInnerV2,
@@ -1086,7 +1086,7 @@ export default sbp('sbp/selectors/register', {
       sbp('chelonia/private/stopClockSync')
     }
     sbp('chelonia/private/startClockSync')
-    const rawKvHandler = options.messageHandlers?.[NOTIFICATION_TYPE.KV]
+    const rawKvHandler = options.messageHandlers?.[KV]
     this.pubsub = new PubsubClient({
       ...this.config.connectionOptions,
       handlers: {
@@ -1117,7 +1117,7 @@ export default sbp('sbp/selectors/register', {
         ...Object.fromEntries(
           Object.entries(options.messageHandlers || {}).map(([k, v]) => {
             switch (k) {
-              case NOTIFICATION_TYPE.PUB:
+              case PUB:
                 return [
                   k,
                   (msg: {
@@ -1158,7 +1158,7 @@ export default sbp('sbp/selectors/register', {
                     })
                   }
                 ]
-              case NOTIFICATION_TYPE.DELETION:
+              case DELETION:
                 return [
                   k,
                   (msg: { data: unknown }) =>
@@ -1172,7 +1172,7 @@ export default sbp('sbp/selectors/register', {
             }
           })
         ),
-        [NOTIFICATION_TYPE.KV]: (msg: {
+        [KV]: (msg: {
           channelID: string; key: string; data: string; cid?: string
         }) => {
           if (!msg.channelID || !msg.key) {
@@ -1240,7 +1240,7 @@ export default sbp('sbp/selectors/register', {
             )
           })
         },
-        [NOTIFICATION_TYPE.ENTRY] (msg) {
+        [ENTRY] (msg) {
           // We MUST use 'chelonia/private/in/enqueueHandleEvent' to ensure handleEvent()
           // is called AFTER any currently-running calls to 'chelonia/private/in/sync'
           // to prevent gi.db from throwing "bad previousHEAD" errors.

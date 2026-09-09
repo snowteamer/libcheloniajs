@@ -1,37 +1,18 @@
 import '@sbp/okturtles.events';
 import type { JSONObject, JSONType } from '../types.cjs';
-export declare const NOTIFICATION_TYPE: Readonly<{
-    ENTRY: "entry";
-    DELETION: "deletion";
-    KV: "kv";
-    KV_FILTER: "kv_filter";
-    PING: "ping";
-    PONG: "pong";
-    PUB: "pub";
-    SUB: "sub";
-    UNSUB: "unsub";
-    VERSION_INFO: "version_info";
-}>;
-export declare const REQUEST_TYPE: Readonly<{
-    PUB: "pub";
-    SUB: "sub";
-    UNSUB: "unsub";
-    PUSH_ACTION: "push_action";
-    KV_FILTER: "kv_filter";
-}>;
-export declare const RESPONSE_TYPE: Readonly<{
-    ERROR: "error";
-    OK: "ok";
-}>;
-export declare const PUSH_SERVER_ACTION_TYPE: Readonly<{
-    SEND_PUBLIC_KEY: "send-public-key";
-    STORE_SUBSCRIPTION: "store-subscription";
-    DELETE_SUBSCRIPTION: "delete-subscription";
-    SEND_PUSH_NOTIFICATION: "send-push-notification";
-}>;
-export type NotificationTypeEnum = (typeof NOTIFICATION_TYPE)[keyof typeof NOTIFICATION_TYPE];
-export type RequestTypeEnum = (typeof REQUEST_TYPE)[keyof typeof REQUEST_TYPE];
-export type ResponseTypeEnum = (typeof RESPONSE_TYPE)[keyof typeof RESPONSE_TYPE];
+export declare const DELETION = "deletion";
+export declare const ENTRY = "entry";
+export declare const ERROR = "error";
+export declare const KV = "kv";
+export declare const KV_FILTER = "kv_filter";
+export declare const OK = "ok";
+export declare const PING = "ping";
+export declare const PONG = "pong";
+export declare const PUB = "pub";
+export declare const PUSH_ACTION = "push_action";
+export declare const SUB = "sub";
+export declare const UNSUB = "unsub";
+export declare const VERSION_INFO = "version_info";
 type TimeoutID = ReturnType<typeof setTimeout>;
 export type PubsubOptions = typeof PubsubClient.defaultOptions & {
     handlers: Partial<ClientEventHandlers>;
@@ -55,35 +36,35 @@ type ClientEventHandlers = {
     'subscription-succeeded'(this: PubsubClient, event: CustomEvent): void;
 };
 type MessageHandlers = {
-    [NOTIFICATION_TYPE.ENTRY](this: PubsubClient, msg: {
+    [ENTRY](this: PubsubClient, msg: {
         data: JSONType;
         type: string;
         [x: string]: unknown;
     }): void;
-    [NOTIFICATION_TYPE.PING](this: PubsubClient, msg: {
+    [PING](this: PubsubClient, msg: {
         data: JSONType;
     }): void;
-    [NOTIFICATION_TYPE.PUB](this: PubsubClient, msg: {
+    [PUB](this: PubsubClient, msg: {
         channelID: string;
         data: JSONType;
     }): void;
-    [NOTIFICATION_TYPE.KV](this: PubsubClient, msg: {
+    [KV](this: PubsubClient, msg: {
         channelID: string;
         key: string;
         data: JSONType;
         cid?: string;
     }): void;
-    [NOTIFICATION_TYPE.SUB](this: PubsubClient, msg: {
+    [SUB](this: PubsubClient, msg: {
         channelID: string;
         type: string;
         data: JSONType;
     }): void;
-    [NOTIFICATION_TYPE.UNSUB](this: PubsubClient, msg: {
+    [UNSUB](this: PubsubClient, msg: {
         channelID: string;
         type: string;
         data: JSONType;
     }): void;
-    [RESPONSE_TYPE.ERROR](this: PubsubClient, msg: {
+    [ERROR](this: PubsubClient, msg: {
         data: {
             type: string;
             channelID: string;
@@ -93,7 +74,7 @@ type MessageHandlers = {
             message?: string;
         };
     }): void;
-    [RESPONSE_TYPE.OK](this: PubsubClient, msg: {
+    [OK](this: PubsubClient, msg: {
         data: {
             type: string;
             channelID: string;
@@ -170,7 +151,7 @@ export default class PubsubClient {
         maxOpRetries: number;
         opRetryInterval: number;
     };
-    pendingOperations: TieredMap<RequestTypeEnum, string, object>;
+    pendingOperations: TieredMap<string, string, object>;
     pingTimeoutID?: TimeoutID;
     shouldReconnect: boolean;
     socket: WebSocket | null;
@@ -227,6 +208,6 @@ export declare function createMessage(type: string, data: JSONType, meta?: objec
 };
 export declare function createKvMessage(channelID: string, key: string, data: JSONType, cid?: string): string;
 export declare function createPubMessage(channelID: string, data: JSONType): string;
-export declare function createRequest(type: RequestTypeEnum, data: JSONObject): string;
+export declare function createRequest(type: string, data: JSONObject): string;
 export declare const messageParser: (data: string) => Message;
 export {};
