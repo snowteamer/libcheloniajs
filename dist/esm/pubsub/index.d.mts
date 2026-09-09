@@ -33,21 +33,9 @@ export type NotificationTypeEnum = (typeof NOTIFICATION_TYPE)[keyof typeof NOTIF
 export type RequestTypeEnum = (typeof REQUEST_TYPE)[keyof typeof REQUEST_TYPE];
 export type ResponseTypeEnum = (typeof RESPONSE_TYPE)[keyof typeof RESPONSE_TYPE];
 type TimeoutID = ReturnType<typeof setTimeout>;
-export type Options = {
-    logPingMessages: boolean;
-    pingTimeout: number;
-    maxReconnectionDelay: number;
-    maxRetries: number;
-    minReconnectionDelay: number;
-    reconnectOnDisconnection: boolean;
-    reconnectOnOnline: boolean;
-    reconnectOnTimeout: boolean;
-    reconnectionDelayGrowFactor: number;
-    timeout: number;
-    maxOpRetries: number;
-    opRetryInterval: number;
-    handlers?: Partial<ClientEventHandlers>;
-    messageHandlers?: Partial<MessageHandlers>;
+export type PubsubOptions = typeof PubsubClient.defaultOptions & {
+    handlers: Partial<ClientEventHandlers>;
+    messageHandlers: MessageHandlers;
 };
 export type Message = {
     [key: string]: JSONType;
@@ -144,6 +132,20 @@ declare class TieredMap<K, L, V> extends Map<K, Map<L, V>> {
     tClear(k1: K): void;
 }
 export default class PubsubClient {
+    static defaultOptions: {
+        logPingMessages: boolean;
+        pingTimeout: number;
+        maxReconnectionDelay: number;
+        maxRetries: number;
+        minReconnectionDelay: number;
+        reconnectOnDisconnection: boolean;
+        reconnectOnOnline: boolean;
+        reconnectOnTimeout: boolean;
+        reconnectionDelayGrowFactor: number;
+        timeout: number;
+        maxOpRetries: number;
+        opRetryInterval: number;
+    };
     connectionTimeoutID?: TimeoutID;
     connectionTimeUsed: number;
     customEventHandlers: Partial<ClientEventHandlers>;
@@ -154,18 +156,27 @@ export default class PubsubClient {
     listeners: ClientEventHandlers;
     messageHandlers: MessageHandlers;
     nextConnectionAttemptDelayID?: TimeoutID;
-    options: Options;
+    options: {
+        logPingMessages: boolean;
+        pingTimeout: number;
+        maxReconnectionDelay: number;
+        maxRetries: number;
+        minReconnectionDelay: number;
+        reconnectOnDisconnection: boolean;
+        reconnectOnOnline: boolean;
+        reconnectOnTimeout: boolean;
+        reconnectionDelayGrowFactor: number;
+        timeout: number;
+        maxOpRetries: number;
+        opRetryInterval: number;
+    };
     pendingOperations: TieredMap<RequestTypeEnum, string, object>;
     pingTimeoutID?: TimeoutID;
     shouldReconnect: boolean;
     socket: WebSocket | null;
     subscriptionSet: Set<string>;
     url: string;
-    /**
-     *
-     * @param {Partial<Options>} options
-     */
-    constructor(options?: Partial<Options>);
+    constructor(options?: Partial<PubsubOptions>);
     clearAllTimers(): void;
     /**
      * Performs a connection or reconnection attempt.

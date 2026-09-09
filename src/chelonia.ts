@@ -98,7 +98,7 @@ import {
   ParsedEncryptedOrUnencryptedMessage,
   ChelKvGetResult
 } from './types.js'
-import type { Options as PubSubOptions } from './pubsub/index.js'
+import type { PubsubOptions } from './pubsub/index.js'
 
 // TODO: define ChelContractType for /defineContract
 
@@ -1069,7 +1069,7 @@ export default sbp('sbp/selectors/register', {
   // TODO: allow connecting to multiple servers at once
   'chelonia/connect': function (
     this: CheloniaContext,
-    options: Partial<PubSubOptions> = {}
+    options: Partial<PubsubOptions> = {}
   ): PubsubClient {
     if (!this.config.connectionURL) throw new Error('config.connectionURL missing')
     if (!this.config.connectionOptions) throw new Error('config.connectionOptions missing')

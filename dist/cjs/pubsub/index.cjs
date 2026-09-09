@@ -42,29 +42,6 @@ exports.PUSH_SERVER_ACTION_TYPE = Object.freeze({
     DELETE_SUBSCRIPTION: 'delete-subscription',
     SEND_PUSH_NOTIFICATION: 'send-push-notification'
 });
-const defaultOptions = {
-    // Whether to log received pings.
-    logPingMessages: process.env.NODE_ENV === 'development' && !process.env.CI,
-    // How long to wait for the server to send a ping, in milliseconds.
-    pingTimeout: 45000,
-    maxReconnectionDelay: 60000,
-    maxRetries: 10,
-    minReconnectionDelay: 500,
-    // Whether to reconnect after a server-side disconnection.
-    reconnectOnDisconnection: true,
-    // Whether to reconnect after coming back online.
-    reconnectOnOnline: true,
-    // Whether to reconnect after a connection timeout.
-    // Defaults to false to avoid reconnection attempts in case the server doesn't
-    // respond because of a failed authentication.
-    reconnectOnTimeout: false,
-    reconnectionDelayGrowFactor: 2,
-    // Connection timeout duration in milliseconds.
-    timeout: 60000,
-    /* Options for runWithRetries(), which uses linear backoff rather than exponential. */
-    maxOpRetries: 4,
-    opRetryInterval: 2000
-};
 // ====== Event name constants ====== //
 exports.PUBSUB_ERROR = 'pubsub-error';
 exports.PUBSUB_RECONNECTION_ATTEMPT = 'pubsub-reconnection-attempt';
@@ -166,6 +143,31 @@ function runWithRetry(client, channelID, type, getPayload) {
     send();
 }
 class PubsubClient {
+    static defaultOptions = {
+        // Whether to log received pings.
+        logPingMessages: process.env.NODE_ENV === 'development' && !process.env.CI,
+        // How long to wait for the server to send a ping, in milliseconds.
+        pingTimeout: 45000,
+        maxReconnectionDelay: 60000,
+        maxRetries: 10,
+        minReconnectionDelay: 500,
+        // Whether to reconnect after a server-side disconnection.
+        reconnectOnDisconnection: true,
+        // Whether to reconnect after coming back online.
+        reconnectOnOnline: true,
+        // Whether to reconnect after a connection timeout.
+        // Defaults to false to avoid reconnection attempts in case the server doesn't
+        // respond because of a failed authentication.
+        reconnectOnTimeout: false,
+        reconnectionDelayGrowFactor: 2,
+        // Connection timeout duration in milliseconds.
+        timeout: 60000,
+        /* Options for runWithRetries(), which uses linear backoff rather than exponential. */
+        // Maximum retry attempts after initial send (maxOpRetries + 1 total attempts)
+        maxOpRetries: 4,
+        // Base interval between retries (linear backoff)
+        opRetryInterval: 2000
+    };
     connectionTimeoutID;
     connectionTimeUsed = 0;
     customEventHandlers = {};
@@ -180,7 +182,7 @@ class PubsubClient {
     listeners = Object.create(null);
     messageHandlers = { ...defaultMessageHandlers };
     nextConnectionAttemptDelayID;
-    options = { ...defaultOptions };
+    options = { ...PubsubClient.defaultOptions };
     pendingOperations = new TieredMap();
     pingTimeoutID;
     shouldReconnect = true;
@@ -189,14 +191,10 @@ class PubsubClient {
     socket = null;
     subscriptionSet = new Set();
     url = "";
-    /**
-     *
-     * @param {Partial<Options>} options
-     */
     constructor(options = {}) {
         Object.assign(this.customEventHandlers, options.handlers ?? {});
         Object.assign(this.messageHandlers, options.messageHandlers ?? {});
-        Object.assign(this.options, options ?? {});
+        Object.assign(this.options, options);
         const client = this;
         // Create and save references to reusable event listeners.
         // Every time a new underlying WebSocket object will be created for this

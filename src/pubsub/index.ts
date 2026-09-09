@@ -47,29 +47,10 @@ export type ResponseTypeEnum = (typeof RESPONSE_TYPE)[keyof typeof RESPONSE_TYPE
 
 type TimeoutID = ReturnType<typeof setTimeout>;
 
-export type Options = {
-  // Whether to log received pings.
-  logPingMessages: boolean;
-  pingTimeout: number;
-  maxReconnectionDelay: number;
-  maxRetries: number;
-  minReconnectionDelay: number;
-  reconnectOnDisconnection: boolean;
-  reconnectOnOnline: boolean;
-  reconnectOnTimeout: boolean;
-  reconnectionDelayGrowFactor: number;
-  timeout: number;
-  // Maximum retry attempts after initial send (maxOpRetries + 1 total attempts)
-  maxOpRetries: number;
-  // Base interval between retries (linear backoff)
-  opRetryInterval: number;
-  // Custom handlers for WebSocket events.
-  // eslint-disable-next-line no-use-before-define
-  handlers?: Partial<ClientEventHandlers>;
-  // Custom handlers for different message types.
-  // eslint-disable-next-line no-use-before-define
-  messageHandlers?: Partial<MessageHandlers>;
-};
+export type PubsubOptions = typeof PubsubClient.defaultOptions & {
+  handlers: Partial<ClientEventHandlers>;
+  messageHandlers: MessageHandlers;
+}
 
 export type Message = {
   [key: string]: JSONType;
@@ -145,32 +126,6 @@ export type UnsubMessage = {
   type: 'unsub';
   channelID: string;
 };
-
-const defaultOptions: Options = {
-  // Whether to log received pings.
-  logPingMessages: process.env.NODE_ENV === 'development' && !process.env.CI,
-  // How long to wait for the server to send a ping, in milliseconds.
-  pingTimeout: 45000,
-  maxReconnectionDelay: 60000,
-  maxRetries: 10,
-  minReconnectionDelay: 500,
-  // Whether to reconnect after a server-side disconnection.
-  reconnectOnDisconnection: true,
-  // Whether to reconnect after coming back online.
-  reconnectOnOnline: true,
-  // Whether to reconnect after a connection timeout.
-  // Defaults to false to avoid reconnection attempts in case the server doesn't
-  // respond because of a failed authentication.
-  reconnectOnTimeout: false,
-  reconnectionDelayGrowFactor: 2,
-  // Connection timeout duration in milliseconds.
-  timeout: 60000,
-
-  /* Options for runWithRetries(), which uses linear backoff rather than exponential. */
-
-  maxOpRetries: 4,
-  opRetryInterval: 2000
-}
 
 // ====== Event name constants ====== //
 
@@ -297,6 +252,34 @@ function runWithRetry (
 }
 
 export default class PubsubClient {
+  static defaultOptions = {
+    // Whether to log received pings.
+    logPingMessages: process.env.NODE_ENV === 'development' && !process.env.CI,
+    // How long to wait for the server to send a ping, in milliseconds.
+    pingTimeout: 45000,
+    maxReconnectionDelay: 60000,
+    maxRetries: 10,
+    minReconnectionDelay: 500,
+    // Whether to reconnect after a server-side disconnection.
+    reconnectOnDisconnection: true,
+    // Whether to reconnect after coming back online.
+    reconnectOnOnline: true,
+    // Whether to reconnect after a connection timeout.
+    // Defaults to false to avoid reconnection attempts in case the server doesn't
+    // respond because of a failed authentication.
+    reconnectOnTimeout: false,
+    reconnectionDelayGrowFactor: 2,
+    // Connection timeout duration in milliseconds.
+    timeout: 60000,
+
+    /* Options for runWithRetries(), which uses linear backoff rather than exponential. */
+
+    // Maximum retry attempts after initial send (maxOpRetries + 1 total attempts)
+    maxOpRetries: 4,
+    // Base interval between retries (linear backoff)
+    opRetryInterval: 2000
+  }
+
   connectionTimeoutID?: TimeoutID
   connectionTimeUsed = 0
   customEventHandlers: Partial<ClientEventHandlers> = {}
@@ -311,7 +294,7 @@ export default class PubsubClient {
   listeners: ClientEventHandlers = Object.create(null)
   messageHandlers: MessageHandlers = { ...defaultMessageHandlers }
   nextConnectionAttemptDelayID?: TimeoutID
-  options: Options = { ...defaultOptions }
+  options = { ...PubsubClient.defaultOptions }
   pendingOperations: TieredMap<RequestTypeEnum, string, object> = new TieredMap()
   pingTimeoutID?: TimeoutID
   shouldReconnect = true
@@ -321,14 +304,10 @@ export default class PubsubClient {
   subscriptionSet: Set<string> = new Set()
   url = ""
 
-  /**
-   *
-   * @param {Partial<Options>} options
-   */
-  constructor (options: Partial<Options> = {}) {
+  constructor (options: Partial<PubsubOptions> = {}) {
     Object.assign(this.customEventHandlers, options.handlers ?? {})
     Object.assign(this.messageHandlers, options.messageHandlers ?? {})
-    Object.assign(this.options, options ?? {})
+    Object.assign(this.options, options)
 
     const client = this
     // Create and save references to reusable event listeners.
