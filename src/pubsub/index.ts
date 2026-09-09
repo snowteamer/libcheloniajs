@@ -63,9 +63,6 @@ export type Options = {
   maxOpRetries: number;
   // Base interval between retries (linear backoff)
   opRetryInterval: number;
-  // Whether the factory should call 'connect()' automatically.
-  // Also named 'autoConnect' or 'startClosed' in other libraries.
-  manual?: boolean;
   // Custom handlers for WebSocket events.
   // eslint-disable-next-line no-use-before-define
   handlers?: Partial<ClientEventHandlers>;
@@ -326,14 +323,12 @@ export default class PubsubClient {
 
   /**
    *
-   * @param {string} url - A WebSocket URL to connect to.
    * @param {Partial<Options>} options
    */
-  constructor (url: string, options: Partial<Options> = {}) {
+  constructor (options: Partial<Options> = {}) {
     Object.assign(this.customEventHandlers, options.handlers ?? {})
     Object.assign(this.messageHandlers, options.messageHandlers ?? {})
     Object.assign(this.options, options ?? {})
-    this.url = url.replace(/^http/, 'ws')
 
     const client = this
     // Create and save references to reusable event listeners.
@@ -369,10 +364,6 @@ export default class PubsubClient {
         globalEventMap.set(name, client.listeners[name])
       }
     }
-    if (!client.options.manual) {
-      client.connect()
-    }
-    return client
   }
 
   clearAllTimers () {
@@ -386,10 +377,14 @@ export default class PubsubClient {
     client.pingTimeoutID = undefined
   }
 
-  // Performs a connection or reconnection attempt.
-  connect () {
+  /**
+   * Performs a connection or reconnection attempt.
+   * @param url - A HTTP or WebSocket URL to connect to.
+   */
+  connect (url: string) {
     const client = this
 
+    const wsURL = url.replace(/^http/, 'ws')
     if (client.socket !== null) {
       throw new Error('connect() can only be called if there is no current socket.')
     }
@@ -399,6 +394,9 @@ export default class PubsubClient {
     if (!client.shouldReconnect) {
       throw new Error('connect() should no longer be called on this instance.')
     }
+    if (client.url === wsURL) return console.warn(`connect(): already connected to "${wsURL}"`)
+    client.url = wsURL
+
     client.socket = new WebSocket(client.url)
     // Sometimes (like when using `createMessage`), we want to send objects that
     // are serialized as strings. Native web sockets don't support objects, so
@@ -507,7 +505,7 @@ export default class PubsubClient {
     client.nextConnectionAttemptDelayID = setTimeout(() => {
       sbp('okTurtles.events/emit', PUBSUB_RECONNECTION_ATTEMPT, client)
       client.nextConnectionAttemptDelayID = undefined
-      client.connect()
+      client.connect(client.url)
     }, delay)
     sbp('okTurtles.events/emit', PUBSUB_RECONNECTION_SCHEDULED, client, { delay, nth })
   }

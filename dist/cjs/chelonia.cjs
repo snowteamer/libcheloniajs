@@ -802,7 +802,7 @@ exports.default = (0, sbp_1.default)('sbp/selectors/register', {
         }
         (0, sbp_1.default)('chelonia/private/startClockSync');
         const rawKvHandler = options.messageHandlers?.[index_js_1.NOTIFICATION_TYPE.KV];
-        this.pubsub = new index_js_1.default(pubsubURL, {
+        this.pubsub = new index_js_1.default({
             ...this.config.connectionOptions,
             handlers: {
                 ...options.handlers,
@@ -926,6 +926,7 @@ exports.default = (0, sbp_1.default)('sbp/selectors/register', {
                 }
             }
         });
+        this.pubsub.connect(pubsubURL);
         if (this.kvActiveFilters.size > 0) {
             for (const [contractID, keys] of this.kvActiveFilters) {
                 this.pubsub.kvFilter.set(contractID, [...keys]);

@@ -1087,7 +1087,7 @@ export default sbp('sbp/selectors/register', {
     }
     sbp('chelonia/private/startClockSync')
     const rawKvHandler = options.messageHandlers?.[NOTIFICATION_TYPE.KV]
-    this.pubsub = new PubsubClient(pubsubURL, {
+    this.pubsub = new PubsubClient({
       ...this.config.connectionOptions,
       handlers: {
         ...options.handlers,
@@ -1250,6 +1250,7 @@ export default sbp('sbp/selectors/register', {
         }
       }
     })
+    this.pubsub.connect(pubsubURL)
     if (this.kvActiveFilters.size > 0) {
       for (const [contractID, keys] of this.kvActiveFilters) {
         this.pubsub.kvFilter.set(contractID, [...keys])

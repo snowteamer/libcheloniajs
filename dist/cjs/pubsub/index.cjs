@@ -191,14 +191,12 @@ class PubsubClient {
     url = "";
     /**
      *
-     * @param {string} url - A WebSocket URL to connect to.
      * @param {Partial<Options>} options
      */
-    constructor(url, options = {}) {
+    constructor(options = {}) {
         Object.assign(this.customEventHandlers, options.handlers ?? {});
         Object.assign(this.messageHandlers, options.messageHandlers ?? {});
         Object.assign(this.options, options ?? {});
-        this.url = url.replace(/^http/, 'ws');
         const client = this;
         // Create and save references to reusable event listeners.
         // Every time a new underlying WebSocket object will be created for this
@@ -226,10 +224,6 @@ class PubsubClient {
                 globalEventMap.set(name, client.listeners[name]);
             }
         }
-        if (!client.options.manual) {
-            client.connect();
-        }
-        return client;
     }
     clearAllTimers() {
         const client = this;
@@ -240,9 +234,13 @@ class PubsubClient {
         client.nextConnectionAttemptDelayID = undefined;
         client.pingTimeoutID = undefined;
     }
-    // Performs a connection or reconnection attempt.
-    connect() {
+    /**
+     * Performs a connection or reconnection attempt.
+     * @param url - A HTTP or WebSocket URL to connect to.
+     */
+    connect(url) {
         const client = this;
+        const wsURL = url.replace(/^http/, 'ws');
         if (client.socket !== null) {
             throw new Error('connect() can only be called if there is no current socket.');
         }
@@ -252,6 +250,9 @@ class PubsubClient {
         if (!client.shouldReconnect) {
             throw new Error('connect() should no longer be called on this instance.');
         }
+        if (client.url === wsURL)
+            return console.warn(`connect(): already connected to "${wsURL}"`);
+        client.url = wsURL;
         client.socket = new WebSocket(client.url);
         // Sometimes (like when using `createMessage`), we want to send objects that
         // are serialized as strings. Native web sockets don't support objects, so
@@ -339,7 +340,7 @@ class PubsubClient {
         client.nextConnectionAttemptDelayID = setTimeout(() => {
             (0, sbp_1.default)('okTurtles.events/emit', exports.PUBSUB_RECONNECTION_ATTEMPT, client);
             client.nextConnectionAttemptDelayID = undefined;
-            client.connect();
+            client.connect(client.url);
         }, delay);
         (0, sbp_1.default)('okTurtles.events/emit', exports.PUBSUB_RECONNECTION_SCHEDULED, client, { delay, nth });
     }

@@ -46,7 +46,6 @@ export type Options = {
     timeout: number;
     maxOpRetries: number;
     opRetryInterval: number;
-    manual?: boolean;
     handlers?: Partial<ClientEventHandlers>;
     messageHandlers?: Partial<MessageHandlers>;
 };
@@ -164,12 +163,15 @@ export default class PubsubClient {
     url: string;
     /**
      *
-     * @param {string} url - A WebSocket URL to connect to.
      * @param {Partial<Options>} options
      */
-    constructor(url: string, options?: Partial<Options>);
+    constructor(options?: Partial<Options>);
     clearAllTimers(): void;
-    connect(): void;
+    /**
+     * Performs a connection or reconnection attempt.
+     * @param url - A HTTP or WebSocket URL to connect to.
+     */
+    connect(url: string): void;
     /**
      * Immediately close the socket, stop listening for events and clear any cache.
      *

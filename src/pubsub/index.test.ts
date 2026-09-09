@@ -2,8 +2,7 @@ import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import PubsubClient from './index.js'
 
-const client = new PubsubClient('ws://localhost:8080', {
-  manual: true,
+const client = new PubsubClient({
   reconnectOnDisconnection: false,
   reconnectOnOnline: false,
   reconnectOnTimeout: false
