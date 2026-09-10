@@ -13,6 +13,38 @@ export declare const PUSH_ACTION = "push_action";
 export declare const SUB = "sub";
 export declare const UNSUB = "unsub";
 export declare const VERSION_INFO = "version_info";
+export declare const NOTIFICATION_TYPE: Readonly<{
+    ENTRY: "entry";
+    DELETION: "deletion";
+    KV: "kv";
+    KV_FILTER: "kv_filter";
+    PING: "ping";
+    PONG: "pong";
+    PUB: "pub";
+    SUB: "sub";
+    UNSUB: "unsub";
+    VERSION_INFO: "version_info";
+}>;
+export declare const REQUEST_TYPE: Readonly<{
+    PUB: "pub";
+    SUB: "sub";
+    UNSUB: "unsub";
+    PUSH_ACTION: "push_action";
+    KV_FILTER: "kv_filter";
+}>;
+export declare const RESPONSE_TYPE: Readonly<{
+    ERROR: "error";
+    OK: "ok";
+}>;
+export declare const PUSH_SERVER_ACTION_TYPE: Readonly<{
+    SEND_PUBLIC_KEY: "send-public-key";
+    STORE_SUBSCRIPTION: "store-subscription";
+    DELETE_SUBSCRIPTION: "delete-subscription";
+    SEND_PUSH_NOTIFICATION: "send-push-notification";
+}>;
+export type NotificationTypeEnum = (typeof NOTIFICATION_TYPE)[keyof typeof NOTIFICATION_TYPE];
+export type RequestTypeEnum = (typeof REQUEST_TYPE)[keyof typeof REQUEST_TYPE];
+export type ResponseTypeEnum = (typeof RESPONSE_TYPE)[keyof typeof RESPONSE_TYPE];
 type TimeoutID = ReturnType<typeof setTimeout>;
 export type PubsubOptions = typeof PubsubClient.defaultOptions & {
     handlers: Partial<ClientEventHandlers>;

@@ -20,6 +20,46 @@ export const SUB = 'sub'
 export const UNSUB = 'unsub'
 export const VERSION_INFO = 'version_info'
 
+// TODO: remove these enums when no longer imported from anywhere.
+// ====== Enums ====== //
+
+export const NOTIFICATION_TYPE = Object.freeze({
+  ENTRY: 'entry',
+  DELETION: 'deletion',
+  KV: 'kv',
+  KV_FILTER: 'kv_filter',
+  PING: 'ping',
+  PONG: 'pong',
+  PUB: 'pub',
+  SUB: 'sub',
+  UNSUB: 'unsub',
+  VERSION_INFO: 'version_info'
+})
+
+export const REQUEST_TYPE = Object.freeze({
+  PUB: 'pub',
+  SUB: 'sub',
+  UNSUB: 'unsub',
+  PUSH_ACTION: 'push_action',
+  KV_FILTER: 'kv_filter'
+})
+
+export const RESPONSE_TYPE = Object.freeze({
+  ERROR: 'error',
+  OK: 'ok'
+})
+
+export const PUSH_SERVER_ACTION_TYPE = Object.freeze({
+  SEND_PUBLIC_KEY: 'send-public-key',
+  STORE_SUBSCRIPTION: 'store-subscription',
+  DELETE_SUBSCRIPTION: 'delete-subscription',
+  SEND_PUSH_NOTIFICATION: 'send-push-notification'
+})
+
+export type NotificationTypeEnum = (typeof NOTIFICATION_TYPE)[keyof typeof NOTIFICATION_TYPE];
+export type RequestTypeEnum = (typeof REQUEST_TYPE)[keyof typeof REQUEST_TYPE];
+export type ResponseTypeEnum = (typeof RESPONSE_TYPE)[keyof typeof RESPONSE_TYPE];
+
 // ====== Types ====== //
 
 type TimeoutID = ReturnType<typeof setTimeout>;

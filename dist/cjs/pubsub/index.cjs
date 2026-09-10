@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.messageParser = exports.PUBSUB_SUBSCRIPTION_SUCCEEDED = exports.PUBSUB_RECONNECTION_SUCCEEDED = exports.PUBSUB_RECONNECTION_SCHEDULED = exports.PUBSUB_RECONNECTION_FAILED = exports.PUBSUB_RECONNECTION_ATTEMPT = exports.PUBSUB_ERROR = exports.VERSION_INFO = exports.UNSUB = exports.SUB = exports.PUSH_ACTION = exports.PUB = exports.PONG = exports.PING = exports.OK = exports.KV_FILTER = exports.KV = exports.ERROR = exports.ENTRY = exports.DELETION = void 0;
+exports.messageParser = exports.PUBSUB_SUBSCRIPTION_SUCCEEDED = exports.PUBSUB_RECONNECTION_SUCCEEDED = exports.PUBSUB_RECONNECTION_SCHEDULED = exports.PUBSUB_RECONNECTION_FAILED = exports.PUBSUB_RECONNECTION_ATTEMPT = exports.PUBSUB_ERROR = exports.PUSH_SERVER_ACTION_TYPE = exports.RESPONSE_TYPE = exports.REQUEST_TYPE = exports.NOTIFICATION_TYPE = exports.VERSION_INFO = exports.UNSUB = exports.SUB = exports.PUSH_ACTION = exports.PUB = exports.PONG = exports.PING = exports.OK = exports.KV_FILTER = exports.KV = exports.ERROR = exports.ENTRY = exports.DELETION = void 0;
 exports.createMessage = createMessage;
 exports.createKvMessage = createKvMessage;
 exports.createPubMessage = createPubMessage;
@@ -26,6 +26,37 @@ exports.PUSH_ACTION = 'push_action';
 exports.SUB = 'sub';
 exports.UNSUB = 'unsub';
 exports.VERSION_INFO = 'version_info';
+// TODO: remove these enums when no longer imported from anywhere.
+// ====== Enums ====== //
+exports.NOTIFICATION_TYPE = Object.freeze({
+    ENTRY: 'entry',
+    DELETION: 'deletion',
+    KV: 'kv',
+    KV_FILTER: 'kv_filter',
+    PING: 'ping',
+    PONG: 'pong',
+    PUB: 'pub',
+    SUB: 'sub',
+    UNSUB: 'unsub',
+    VERSION_INFO: 'version_info'
+});
+exports.REQUEST_TYPE = Object.freeze({
+    PUB: 'pub',
+    SUB: 'sub',
+    UNSUB: 'unsub',
+    PUSH_ACTION: 'push_action',
+    KV_FILTER: 'kv_filter'
+});
+exports.RESPONSE_TYPE = Object.freeze({
+    ERROR: 'error',
+    OK: 'ok'
+});
+exports.PUSH_SERVER_ACTION_TYPE = Object.freeze({
+    SEND_PUBLIC_KEY: 'send-public-key',
+    STORE_SUBSCRIPTION: 'store-subscription',
+    DELETE_SUBSCRIPTION: 'delete-subscription',
+    SEND_PUSH_NOTIFICATION: 'send-push-notification'
+});
 // ====== Event name constants ====== //
 exports.PUBSUB_ERROR = 'pubsub-error';
 exports.PUBSUB_RECONNECTION_ATTEMPT = 'pubsub-reconnection-attempt';
