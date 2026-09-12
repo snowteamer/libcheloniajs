@@ -13,7 +13,7 @@ import {
 } from 'turtledash'
 import { createCID, maybeParseCID, multicodes, parseCID } from './functions.js'
 import { Buffer } from 'buffer'
-import { DELETION, ENTRY, KV, PUB, PUBSUB_RECONNECTION_SUCCEEDED, default as PubsubClient } from './pubsub/index.js'
+import { DELETION, ENTRY, KV, PUB, PUBSUB_RECONNECTION_SUCCEEDED, default as PubSubClient } from './pubsub/index.js'
 import { clearReingestTrackerAll } from './reingestTracker.js'
 import type {
   ProtoSPOpKeyRequestInnerV2,
@@ -98,7 +98,7 @@ import {
   ParsedEncryptedOrUnencryptedMessage,
   ChelKvGetResult
 } from './types.js'
-import type { PubsubOptions } from './pubsub/index.js'
+import type { PubSubOptions } from './pubsub/index.js'
 
 // TODO: define ChelContractType for /defineContract
 
@@ -1069,8 +1069,8 @@ export default sbp('sbp/selectors/register', {
   // TODO: allow connecting to multiple servers at once
   'chelonia/connect': function (
     this: CheloniaContext,
-    options: Partial<PubsubOptions> = {}
-  ): PubsubClient {
+    options: Partial<PubSubOptions> = {}
+  ): PubSubClient {
     if (!this.config.connectionURL) throw new Error('config.connectionURL missing')
     if (!this.config.connectionOptions) throw new Error('config.connectionOptions missing')
     if (this.pubsub) {
@@ -1087,7 +1087,7 @@ export default sbp('sbp/selectors/register', {
     }
     sbp('chelonia/private/startClockSync')
     const rawKvHandler = options.messageHandlers?.[KV]
-    this.pubsub = new PubsubClient({
+    this.pubsub = new PubSubClient({
       ...this.config.connectionOptions,
       handlers: {
         ...options.handlers,
@@ -1137,7 +1137,7 @@ export default sbp('sbp/selectors/register', {
                     sbp('chelonia/queueInvocation', msg.channelID, () => {
                       (
                         v as (
-                          this: PubsubClient,
+                          this: PubSubClient,
                           msg: ParsedEncryptedOrUnencryptedMessage<object>,
                         ) => void
                       ).call(
@@ -1162,7 +1162,7 @@ export default sbp('sbp/selectors/register', {
                 return [
                   k,
                   (msg: { data: unknown }) =>
-                    (v as unknown as (this: PubsubClient, data: unknown) => void).call(
+                    (v as unknown as (this: PubSubClient, data: unknown) => void).call(
                       this.pubsub,
                       msg.data
                     )
@@ -1213,7 +1213,7 @@ export default sbp('sbp/selectors/register', {
               try {
                 ;(
                   rawKvHandler as unknown as (
-                    this: PubsubClient,
+                    this: PubSubClient,
                     msg: [string, ParsedEncryptedOrUnencryptedMessage<object>],
                   ) => void
                 ).call(this.pubsub, [msg.key, parsed])
@@ -1267,7 +1267,7 @@ export default sbp('sbp/selectors/register', {
       // `client.isNew` is `true` on the initial connection and `false`
       // on reconnects, so we skip the initial connection to avoid
       // duplicating the load that `_reconcileForSlot` already scheduled.
-      this.kvReconnectListener = (client: PubsubClient) => {
+      this.kvReconnectListener = (client: PubSubClient) => {
         if (client !== this.pubsub || client.isNew) return
         sbp('chelonia/kv/_onReconnect')
       }

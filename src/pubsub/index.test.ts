@@ -1,8 +1,8 @@
 import * as assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import PubsubClient from './index.js'
+import PubSubClient from './index.js'
 
-const client = new PubsubClient({
+const client = new PubSubClient({
   reconnectOnDisconnection: false,
   reconnectOnOnline: false,
   reconnectOnTimeout: false

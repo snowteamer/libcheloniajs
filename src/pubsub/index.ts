@@ -68,7 +68,7 @@ export type ResponseTypeEnum = (typeof RESPONSE_TYPE)[keyof typeof RESPONSE_TYPE
 type JsonSbpInvocation = [selector: string, ...args: JSONType[]]
 type TimeoutID = ReturnType<typeof setTimeout>;
 
-export type PubsubOptions = typeof PubsubClient.defaultOptions & {
+export type PubSubOptions = typeof PubSubClient.defaultOptions & {
   handlers: Partial<ClientEventHandlers>;
   messageHandlers: MessageHandlers;
 }
@@ -80,40 +80,40 @@ export type Message = {
 
 
 type ClientEventHandlers = {
-  close(this: PubsubClient, event: CloseEvent): void;
-  error(this: PubsubClient, event: Event): void;
-  message(this: PubsubClient, event: MessageEvent): void;
-  offline(this: PubsubClient, event: Event): void;
-  online(this: PubsubClient, event: Event): void;
-  open(this: PubsubClient, event: Event): void;
-  'reconnection-attempt'(this: PubsubClient, event: CustomEvent): void;
-  'reconnection-succeeded'(this: PubsubClient, event: CustomEvent): void;
-  'reconnection-failed'(this: PubsubClient, event: CustomEvent): void;
-  'reconnection-scheduled'(this: PubsubClient, event: CustomEvent): void;
-  'subscription-succeeded'(this: PubsubClient, event: CustomEvent): void;
+  close(this: PubSubClient, event: CloseEvent): void;
+  error(this: PubSubClient, event: Event): void;
+  message(this: PubSubClient, event: MessageEvent): void;
+  offline(this: PubSubClient, event: Event): void;
+  online(this: PubSubClient, event: Event): void;
+  open(this: PubSubClient, event: Event): void;
+  'reconnection-attempt'(this: PubSubClient, event: CustomEvent): void;
+  'reconnection-succeeded'(this: PubSubClient, event: CustomEvent): void;
+  'reconnection-failed'(this: PubSubClient, event: CustomEvent): void;
+  'reconnection-scheduled'(this: PubSubClient, event: CustomEvent): void;
+  'subscription-succeeded'(this: PubSubClient, event: CustomEvent): void;
 };
 
 type MessageHandlers = {
   [ENTRY](
-    this: PubsubClient,
+    this: PubSubClient,
     msg: { data: JSONType; type: string; [x: string]: unknown },
   ): void;
-  [PING](this: PubsubClient, msg: { data: JSONType }): void;
-  [PUB](this: PubsubClient, msg: { channelID: string; data: JSONType }): void;
+  [PING](this: PubSubClient, msg: { data: JSONType }): void;
+  [PUB](this: PubSubClient, msg: { channelID: string; data: JSONType }): void;
   [KV](
-    this: PubsubClient,
+    this: PubSubClient,
     msg: { channelID: string; key: string; data: JSONType; cid?: string },
   ): void;
   [SUB](
-    this: PubsubClient,
+    this: PubSubClient,
     msg: { channelID: string; type: string; data: JSONType },
   ): void;
   [UNSUB](
-    this: PubsubClient,
+    this: PubSubClient,
     msg: { channelID: string; type: string; data: JSONType },
   ): void;
   [ERROR](
-    this: PubsubClient,
+    this: PubSubClient,
     msg: {
       data: {
         type: string;
@@ -125,12 +125,12 @@ type MessageHandlers = {
       };
     },
   ): void;
-  [OK](this: PubsubClient, msg: {
+  [OK](this: PubSubClient, msg: {
     data: { type: string; channelID: string; kvFilter?: string[] }
   }): void;
-  [RSI](this: PubsubClient, msg: RsiMessage): void;
-  [RSI_ERROR](this: PubsubClient, msg: RsiErrorMessage): void;
-  [RSI_OK](this: PubsubClient, msg: RsiOkMessage): void;
+  [RSI](this: PubSubClient, msg: RsiMessage): void;
+  [RSI_ERROR](this: PubSubClient, msg: RsiErrorMessage): void;
+  [RSI_OK](this: PubSubClient, msg: RsiOkMessage): void;
 };
 
 export type PubMessage = {
@@ -243,13 +243,13 @@ const isKvFilterFresh = (
   return true
 }
 
-const pubPayloadFactory = (client: PubsubClient, channelID: string) => () => {
+const pubPayloadFactory = (client: PubSubClient, channelID: string) => () => {
   const kvFilter = client.kvFilter.get(channelID)
   return kvFilter ? { kvFilter, channelID } : { channelID } as JSONObject
 }
 
 function runWithRetry (
-  client: PubsubClient,
+  client: PubSubClient,
   channelID: string,
   type: string,
   getPayload: () => JSONObject
@@ -293,7 +293,7 @@ function runWithRetry (
   send()
 }
 
-export default class PubsubClient {
+export default class PubSubClient {
   static defaultOptions = {
     // Whether to log received pings.
     logPingMessages: process.env.NODE_ENV === 'development' && !process.env.CI,
@@ -338,7 +338,7 @@ export default class PubsubClient {
   messageCounter = 0
   messageHandlers: MessageHandlers = { ...defaultMessageHandlers }
   nextConnectionAttemptDelayID?: TimeoutID
-  options = { ...PubsubClient.defaultOptions }
+  options = { ...PubSubClient.defaultOptions }
   pendingOperations: TieredMap<string, string, object> = new TieredMap()
   pendingRsiOperations: Map<string, RsiMessage> = new Map()
   pingTimeoutID?: TimeoutID
@@ -351,7 +351,7 @@ export default class PubsubClient {
   subscriptionSet: Set<string> = new Set()
   url = ""
 
-  constructor (options: Partial<PubsubOptions> = {}) {
+  constructor (options: Partial<PubSubOptions> = {}) {
     Object.assign(this.customEventHandlers, options.handlers ?? {})
     Object.assign(this.messageHandlers, options.messageHandlers ?? {})
     Object.assign(this.options, options)
@@ -370,11 +370,11 @@ export default class PubsubClient {
       client.listeners[name] = (event) => {
         try {
           // Use `.call()` to pass the client via the 'this' binding.
-          (defaultClientEventHandlers[name] as (this: PubsubClient, ev: typeof event) => void).call(
+          (defaultClientEventHandlers[name] as (this: PubSubClient, ev: typeof event) => void).call(
             client,
             event
           );
-          (client.customEventHandlers[name] as (this: PubsubClient, ev: typeof event) => void)?.call(
+          (client.customEventHandlers[name] as (this: PubSubClient, ev: typeof event) => void)?.call(
             client,
             event
           )
@@ -1051,7 +1051,7 @@ export const messageParser = (data: string): Message => {
 // Register custom SBP event listeners before the first connection.
 for (const name of Object.keys(defaultClientEventHandlers)) {
   if (name === 'error' || !(socketEventNames as readonly string[]).includes(name)) {
-    sbp('okTurtles.events/on', `pubsub-${name}`, (target: PubsubClient, detail?: object) => {
+    sbp('okTurtles.events/on', `pubsub-${name}`, (target: PubSubClient, detail?: object) => {
       const ev = new CustomEvent(name, { detail });
       (
         target.listeners[name as keyof ClientEventHandlers] as (
