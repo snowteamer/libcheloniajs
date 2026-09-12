@@ -10,6 +10,9 @@ export declare const PING = "ping";
 export declare const PONG = "pong";
 export declare const PUB = "pub";
 export declare const PUSH_ACTION = "push_action";
+export declare const RSI = "rsi";
+export declare const RSI_ERROR = "rsi-error";
+export declare const RSI_OK = "rsi-ok";
 export declare const SUB = "sub";
 export declare const UNSUB = "unsub";
 export declare const VERSION_INFO = "version_info";
@@ -45,6 +48,7 @@ export declare const PUSH_SERVER_ACTION_TYPE: Readonly<{
 export type NotificationTypeEnum = (typeof NOTIFICATION_TYPE)[keyof typeof NOTIFICATION_TYPE];
 export type RequestTypeEnum = (typeof REQUEST_TYPE)[keyof typeof REQUEST_TYPE];
 export type ResponseTypeEnum = (typeof RESPONSE_TYPE)[keyof typeof RESPONSE_TYPE];
+type JsonSbpInvocation = [selector: string, ...args: JSONType[]];
 type TimeoutID = ReturnType<typeof setTimeout>;
 export type PubsubOptions = typeof PubsubClient.defaultOptions & {
     handlers: Partial<ClientEventHandlers>;
@@ -113,10 +117,28 @@ type MessageHandlers = {
             kvFilter?: string[];
         };
     }): void;
+    [RSI](this: PubsubClient, msg: RsiMessage): void;
+    [RSI_ERROR](this: PubsubClient, msg: RsiErrorMessage): void;
+    [RSI_OK](this: PubsubClient, msg: RsiOkMessage): void;
 };
 export type PubMessage = {
     type: 'pub';
     channelID: string;
+    data: JSONType;
+};
+export type RsiMessage = {
+    type: typeof RSI;
+    id: string;
+    data: JsonSbpInvocation;
+};
+export type RsiErrorMessage = {
+    type: typeof RSI_ERROR;
+    to: string;
+    data: JSONType;
+};
+export type RsiOkMessage = {
+    type: typeof RSI_OK;
+    to: string;
     data: JSONType;
 };
 export type SubMessage = {
@@ -163,10 +185,12 @@ export default class PubsubClient {
     connectionTimeUsed: number;
     customEventHandlers: Partial<ClientEventHandlers>;
     failedConnectionAttempts: number;
+    id: string;
     get isLocal(): boolean;
     isNew: boolean;
     kvFilter: Map<string, string[]>;
     listeners: ClientEventHandlers;
+    messageCounter: number;
     messageHandlers: MessageHandlers;
     nextConnectionAttemptDelayID?: TimeoutID;
     options: {
@@ -184,7 +208,10 @@ export default class PubsubClient {
         opRetryInterval: number;
     };
     pendingOperations: TieredMap<string, string, object>;
+    pendingRsiOperations: Map<string, RsiMessage>;
     pingTimeoutID?: TimeoutID;
+    promiseRejectersByMessageID: Map<string, (reason?: any) => void>;
+    promiseResolversByMessageID: Map<string, (value: unknown) => void>;
     shouldReconnect: boolean;
     socket: WebSocket | null;
     subscriptionSet: Set<string>;
@@ -196,6 +223,11 @@ export default class PubsubClient {
      * @param url - A HTTP or WebSocket URL to connect to.
      */
     connect(url: string): void;
+    createRsiMessage(data: JsonSbpInvocation): {
+        type: "rsi";
+        id: string;
+        data: JsonSbpInvocation;
+    };
     /**
      * Immediately close the socket, stop listening for events and clear any cache.
      *
@@ -205,9 +237,11 @@ export default class PubsubClient {
      * - Any pending messages will be discarded.
      */
     destroy(): void;
+    generateMessageID(): string;
     getNextRandomDelay(): number;
     scheduleConnectionAttempt(): void;
     pub(channelID: string, data: JSONType): void;
+    rsi(data: JsonSbpInvocation): Promise<unknown>;
     /**
      * Sends a SUB request to the server as soon as possible.
      *
@@ -222,6 +256,7 @@ export default class PubsubClient {
      * Sends a KV_FILTER request to the server as soon as possible.
      */
     setKvFilter(channelID: string, kvFilter?: string[]): void;
+    tryRsiOperation(op: RsiMessage): void;
     /**
      * Sends an UNSUB request to the server as soon as possible.
      *

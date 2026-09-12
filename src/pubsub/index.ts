@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-this-alias */
 import '@sbp/okturtles.events'
 import sbp from '@sbp/sbp'
-import { randomIntFromRange } from 'turtledash'
+import { randomHexString, randomIntFromRange } from 'turtledash'
 import type { JSONObject, JSONType } from '../types.js'
 
 // ====== Constants ====== //
@@ -16,6 +16,9 @@ export const PING = 'ping'
 export const PONG ='pong'
 export const PUB = 'pub'
 export const PUSH_ACTION = 'push_action'
+export const RSI ='rsi'
+export const RSI_ERROR ='rsi-error'
+export const RSI_OK ='rsi-ok'
 export const SUB = 'sub'
 export const UNSUB = 'unsub'
 export const VERSION_INFO = 'version_info'
@@ -62,6 +65,7 @@ export type ResponseTypeEnum = (typeof RESPONSE_TYPE)[keyof typeof RESPONSE_TYPE
 
 // ====== Types ====== //
 
+type JsonSbpInvocation = [selector: string, ...args: JSONType[]]
 type TimeoutID = ReturnType<typeof setTimeout>;
 
 export type PubsubOptions = typeof PubsubClient.defaultOptions & {
@@ -121,14 +125,35 @@ type MessageHandlers = {
       };
     },
   ): void;
-  [OK](this: PubsubClient, msg: { data:
-    { type: string; channelID: string; kvFilter?: string[] }
+  [OK](this: PubsubClient, msg: {
+    data: { type: string; channelID: string; kvFilter?: string[] }
   }): void;
+  [RSI](this: PubsubClient, msg: RsiMessage): void;
+  [RSI_ERROR](this: PubsubClient, msg: RsiErrorMessage): void;
+  [RSI_OK](this: PubsubClient, msg: RsiOkMessage): void;
 };
 
 export type PubMessage = {
   type: 'pub';
   channelID: string;
+  data: JSONType;
+};
+
+export type RsiMessage = {
+  type: typeof RSI;
+  id: string;
+  data: JsonSbpInvocation
+};
+
+export type RsiErrorMessage = {
+  type: typeof RSI_ERROR;
+  to: string;
+  data: JSONType;
+};
+
+export type RsiOkMessage = {
+  type: typeof RSI_OK;
+  to: string;
   data: JSONType;
 };
 
@@ -300,20 +325,25 @@ export default class PubsubClient {
   connectionTimeoutID?: TimeoutID
   connectionTimeUsed = 0
   customEventHandlers: Partial<ClientEventHandlers> = {}
-  failedConnectionAttempts = 0
   // The current number of connection attempts that failed.
   // Reset to 0 upon successful connection.
   // Used to compute how long to wait before the next reconnection attempt.
+  failedConnectionAttempts = 0
+  id = randomHexString(6)
   get isLocal () { return /\/\/(localhost|127\.0\.0\.1)([:?/]|$)/.test(this.url) }
   // True if this client has never been connected yet.
   isNew = true
   kvFilter: Map<string, string[]> = new Map()
   listeners: ClientEventHandlers = Object.create(null)
+  messageCounter = 0
   messageHandlers: MessageHandlers = { ...defaultMessageHandlers }
   nextConnectionAttemptDelayID?: TimeoutID
   options = { ...PubsubClient.defaultOptions }
   pendingOperations: TieredMap<string, string, object> = new TieredMap()
+  pendingRsiOperations: Map<string, RsiMessage> = new Map()
   pingTimeoutID?: TimeoutID
+  promiseRejectersByMessageID: Map<string, (reason?: any) => void> = new Map()
+  promiseResolversByMessageID: Map<string, (value: unknown) => void> = new Map()
   shouldReconnect = true
   // The underlying WebSocket object.
   // A new one is necessary for every connection or reconnection attempt.
@@ -427,6 +457,10 @@ export default class PubsubClient {
     }
   }
 
+  createRsiMessage (data: JsonSbpInvocation) {
+    return { type: 'rsi' as const, id: this.generateMessageID(), data }
+  }
+
   /**
    * Immediately close the socket, stop listening for events and clear any cache.
    *
@@ -459,6 +493,10 @@ export default class PubsubClient {
     client.listeners = Object.create(null)
     client.socket = null
     client.shouldReconnect = false
+  }
+
+  generateMessageID () {
+    return `${this.id}-${this.messageCounter++}`
   }
 
   getNextRandomDelay (): number {
@@ -514,6 +552,16 @@ export default class PubsubClient {
     }
   }
 
+  // Not idempotent!
+  async rsi (data: JsonSbpInvocation) {
+    const op = this.createRsiMessage(data)
+    this.tryRsiOperation(op)
+    return await new Promise((resolver, rejecter) => {
+      this.promiseResolversByMessageID.set(op.id, resolver)
+      this.promiseRejectersByMessageID.set(op.id, rejecter)
+    })
+  }
+
   /**
    * Sends a SUB request to the server as soon as possible.
    *
@@ -566,6 +614,14 @@ export default class PubsubClient {
       !client.pendingOperations.tHas(UNSUB, channelID)
     ) {
       runWithRetry(client, channelID, KV_FILTER, pubPayloadFactory(client, channelID))
+    }
+  }
+
+  // Should be idempotent, but it's up to the server.
+  tryRsiOperation (op: RsiMessage) {
+    this.pendingRsiOperations.set(op.id, op)
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify(op))
     }
   }
 
@@ -630,8 +686,7 @@ export function createPubMessage (channelID: string, data: JSONType): string {
 }
 
 export function createRequest (type: string, data: JSONObject): string {
-  // Had to use Object.assign() instead of object spreading to make Flow happy.
-  return JSON.stringify(Object.assign({ type }, data))
+  return JSON.stringify({ type, ...data })
 }
 
 // These handlers receive the PubSubClient instance through the `this` binding.
@@ -790,6 +845,11 @@ const defaultClientEventHandlers: ClientEventHandlers = {
         client.socket?.close()
       }, options.pingTimeout)
     }
+    // Send any pending RSI request.
+    console.debug(`[pubsub] Resending ${client.pendingRsiOperations.size} pending RSI requests.`)
+    for (const op of client.pendingRsiOperations.values()) {
+      client.tryRsiOperation(op)
+    }
     // Send any pending subscription request.
     for (const [channelID] of client.pendingOperations.get(SUB) || []) {
       runWithRetry(client, channelID, SUB, pubPayloadFactory(client, channelID))
@@ -824,6 +884,7 @@ const defaultClientEventHandlers: ClientEventHandlers = {
 }
 
 // These handlers receive the PubSubClient instance through the `this` binding.
+/**@ts-ignore */
 const defaultMessageHandlers: MessageHandlers = {
   [ENTRY] (msg) {
     console.debug('[pubsub] Received ENTRY:', msg)
@@ -1000,4 +1061,39 @@ for (const name of Object.keys(defaultClientEventHandlers)) {
       ).call(target, ev)
     })
   }
+}
+
+defaultMessageHandlers[RSI_OK] = async function ({ to, data }: RsiOkMessage) {
+  const { pendingRsiOperations, promiseRejectersByMessageID, promiseResolversByMessageID } = this
+  if (typeof to !== 'string' || to === '') throw new Error('Field "to" must be a non-empty string.')
+  const originalMessage = pendingRsiOperations.get(to)
+  console.log(`[pubsub] Received RSI_OK for message ${to}`, { originalMessage, data });
+  if (!originalMessage) return console.warn('[pubsub] Message %s not found', to);
+  pendingRsiOperations.delete(to);
+  const resolve = this.promiseResolversByMessageID.get(to);
+  promiseRejectersByMessageID.delete(to);
+  promiseResolversByMessageID.delete(to);
+  resolve?.(data);
+  console.log('[pubsub] Promise resolver was called!')
+}
+
+defaultMessageHandlers[RSI_ERROR] = async function ({ to, data }: RsiErrorMessage) {
+  const { pendingRsiOperations, promiseRejectersByMessageID, promiseResolversByMessageID } = this
+  if (typeof to !== 'string' || to === '') throw new Error('Field "to" must be a non-empty string.')
+  console.warn(`[pubsub] Received RSI_ERROR for message ${to}:`, data);
+  const originalMessage = pendingRsiOperations.get(to);
+  console.debug('[pubsub]', { originalMessage });
+  if (!originalMessage) return console.warn('[pubsub] Message %s not found', to);
+  pendingRsiOperations.delete(to);
+  const reject = promiseRejectersByMessageID.get(to);
+  promiseRejectersByMessageID.delete(to);
+  promiseResolversByMessageID.delete(to);
+  reject?.(
+    typeof data === 'string'
+    ? new Error(data)
+    : typeof data === 'object' && data !== null
+    ? Object.assign(new Error(), data)
+    : data
+  );
+  console.log('[pubsub] Promise rejecter was called!')
 }
